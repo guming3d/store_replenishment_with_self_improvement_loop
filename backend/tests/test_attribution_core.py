@@ -287,7 +287,7 @@ def test_model_findings_are_converted_to_deterministic_report():
             "partial": False,
         },
     )
-    assert report["report_version"] == "deterministic-attribution-v2"
+    assert report["report_version"] == "deterministic-attribution-v3"
     assert report["allocations"]
     assert sum(item["signed_contribution_qty"] for item in report["allocations"]) + (
         report["unexplained_signed_gap"]) == pytest.approx(

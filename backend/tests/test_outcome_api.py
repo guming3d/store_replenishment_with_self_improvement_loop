@@ -75,5 +75,21 @@ async def test_outcome_and_knowledge_endpoints(monkeypatch, tmp_path):
             )
             assert resolved.status_code == 200
             assert resolved.json()["entries"] == {}
+
+            claims = await client.get(
+                "/api/attribution/claims/feedback", headers=headers)
+            assert claims.status_code == 200
+            # As with accuracy above, an unscored system must read as no data
+            # rather than as store managers who are always right.
+            assert claims.json()["judged_total"] == 0
+            assert claims.json()["supported_rate"] is None
+            assert claims.json()["by_reason_code"] == {}
+
+            filtered = await client.get(
+                "/api/attribution/claims/feedback"
+                "?date_from=2026-07-01T00:00:00Z&shop_code=1011",
+                headers=headers,
+            )
+            assert filtered.status_code == 200
         finally:
             await client.aclose()

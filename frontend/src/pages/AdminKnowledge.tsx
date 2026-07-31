@@ -13,7 +13,10 @@ const formatScope = (scope: Record<string, string> | null | undefined) => {
   return entries.length ? entries.map(([key, value]) => `${key}=${value}`).join(' · ') : '—';
 };
 
-const formatExpiry = (value: string) => {
+const formatExpiry = (value: string | null | undefined) => {
+  // `new Date(null)` is the epoch, so an entry that simply never expires would
+  // otherwise be rendered as 1970 rather than as having no expiry at all.
+  if (value === null || value === undefined || value === '') return '—';
   const at = new Date(value);
   if (Number.isNaN(at.getTime())) return value;
   return at.toLocaleString();
@@ -69,7 +72,7 @@ export default function AdminKnowledgePage() {
       title: t('admin.knowledgeExpires'),
       dataIndex: 'expires_at',
       width: 190,
-      render: (value: string) => <Text type="secondary">{formatExpiry(value)}</Text>,
+      render: (value: string | null) => <Text type="secondary">{formatExpiry(value)}</Text>,
     },
     {
       title: t('admin.knowledgeVersion'),

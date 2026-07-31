@@ -60,6 +60,7 @@ import type {
   AttributionCaseDetail,
   AttributionCaseStatus,
   AttributionEvidence,
+  ClaimVerdict,
 } from '../types';
 
 const { Paragraph, Text, Title } = Typography;
@@ -102,6 +103,19 @@ const progressStep = (status: AttributionCaseStatus) => {
   if (status === 'RUNNING') return 1;
   if (status === 'NEEDS_REVIEW' || status === 'FAILED' || status === 'CHANGES_REQUESTED') return 3;
   return 4;
+};
+
+/**
+ * How each verdict is presented. OUT_OF_SCOPE is deliberately informational
+ * rather than a warning: the cause registry, not the store manager, is what
+ * came up short there, and colouring it as a failure would read as blame.
+ */
+const CLAIM_VERDICT_STYLE: Record<ClaimVerdict, { alert: 'success' | 'warning' | 'error' | 'info'; tag: string }> = {
+  SUPPORTED: { alert: 'success', tag: 'green' },
+  UNCALIBRATED: { alert: 'warning', tag: 'gold' },
+  CONTRADICTED: { alert: 'error', tag: 'red' },
+  OUT_OF_SCOPE: { alert: 'info', tag: 'blue' },
+  UNVERIFIABLE: { alert: 'info', tag: 'default' },
 };
 
 export default function AttributionCaseDetailPage() {
@@ -338,14 +352,44 @@ export default function AttributionCaseDetailPage() {
     </Space>
   );
 
+  const claim = report?.operator_claim;
+  const claimStyle = claim ? CLAIM_VERDICT_STYLE[claim.verdict] : undefined;
+
   const evidence = (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      {detail.reason_text && (
+      {(detail.reason_text || detail.reason_code) && (
         <Alert
           showIcon
-          type="warning"
-          message={t('attr.operatorEvidence')}
-          description={`${detail.reason_code}: ${detail.reason_text}`}
+          type={claimStyle?.alert ?? 'warning'}
+          message={
+            <Space size="small">
+              {t('attr.operatorEvidence')}
+              {claim && (
+                <Tag color={claimStyle?.tag}>{t(`attr.claim.${claim.verdict}`)}</Tag>
+              )}
+            </Space>
+          }
+          description={
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              <Text>
+                {detail.reason_text
+                  ? `${detail.reason_code}: ${detail.reason_text}`
+                  : detail.reason_code}
+              </Text>
+              {claim && (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {t(`attr.claimHint.${claim.verdict}`)}
+                </Text>
+              )}
+              {claim && claim.unclaimed_supported_causes.length > 0 && (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {t('attr.claimUnclaimed', {
+                    causes: claim.unclaimed_supported_causes.join('、'),
+                  })}
+                </Text>
+              )}
+            </Space>
+          }
         />
       )}
       <Table
@@ -511,7 +555,7 @@ export default function AttributionCaseDetailPage() {
               <AttributionStatusTag status={detail.status} lang={lang} />
               {detail.partial && <Tag color="warning">Partial</Tag>}
             </Space>
-            <Text type="secondary">{detail.case_id} · Run {detail.run_id} · v{detail.case_version}</Text>
+            <Text type="secondary" style={{ display: 'block' }}>{detail.case_id} · Run {detail.run_id} · v{detail.case_version}</Text>
           </div>
           <Space wrap>
             <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>{t('attr.refresh')}</Button>

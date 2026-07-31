@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Literal, get_args
 
+from .claims import UNSUPPORTED_VERDICTS, judge_operator_claim
 from .errors import SnapshotUnavailableError, ValidationError
 
 SHAPLEY_VERSION = "shapley-v1"
@@ -683,6 +684,17 @@ def build_attribution_report(
     if knowledge_candidates and not any(
             item["acceptable"] for item in knowledge_candidates):
         risk_flags.append("NO_CALIBRATABLE_CANDIDATE")
+    # What the store manager said they were doing, checked against what the
+    # evidence supports. Scored here rather than by the model, which is shown the
+    # claim and would only be grading its own anchor. The verdict is reported and
+    # counted; it never feeds an allocation, a Shapley value or a knowledge value.
+    operator_claim = judge_operator_claim(
+        reason_code=case.get("reason_code"),
+        applicable_causes=set(finding_by_code) & set(CAUSE_CODES),
+        candidates=knowledge_candidates,
+    )
+    if operator_claim["verdict"] in UNSUPPORTED_VERDICTS:
+        risk_flags.append("OPERATOR_CLAIM_UNSUPPORTED")
     return {
         "summary": _compose_summary(
             language=output_language, snapshot=snapshot,
@@ -709,6 +721,9 @@ def build_attribution_report(
         # should believe next time, each calibrated against what the store
         # manager actually ordered.
         "knowledge_candidates": knowledge_candidates,
+        # The operator's stated reason, graded against the evidence. Reported for
+        # review and tallied per reason code; it moves no quantity.
+        "operator_claim": operator_claim,
         **conservation,
         "recommended_qty": recommended_qty,
         "override_qty": override_qty,
@@ -729,5 +744,5 @@ def build_attribution_report(
         "partial": bool(model_output.get("partial", False)),
         "decomposition_version": "bare-baseline-v2",
         "narrative_version": NARRATIVE_VERSION,
-        "report_version": "deterministic-attribution-v2",
+        "report_version": "deterministic-attribution-v3",
     }

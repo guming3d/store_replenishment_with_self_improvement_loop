@@ -374,6 +374,7 @@ def _dt(s):
 def _worker_status() -> dict:
     return attribution_worker.status() if attribution_worker else {
         "running": False, "healthy": True, "last_poll_error": None,
+        "crash_count": 0, "crash_reason": None,
     }
 
 
@@ -937,6 +938,23 @@ async def attribution_knowledge_rejections(
 async def attribution_knowledge_feedback():
     """What reviewers accepted and rejected, per cause and per reason."""
     return await _repo().knowledge_feedback_summary()
+
+
+@app.get("/api/attribution/claims/feedback")
+async def attribution_claim_feedback(
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    shop_code: str | None = None,
+):
+    """How often the reason a store manager stated held up against the evidence.
+
+    The counterpart to the knowledge report card: that one grades the diagnostic
+    agents, this one grades the claim they were asked to check. A reason code
+    that is almost never corroborated is either a habit or a cause the registry
+    cannot yet express, and `out_of_scope_total` separates the two.
+    """
+    return await _repo().claim_verdict_summary(
+        date_from=date_from, date_to=date_to, shop_code=shop_code)
 
 
 @app.get("/api/attribution/knowledge/resolve")

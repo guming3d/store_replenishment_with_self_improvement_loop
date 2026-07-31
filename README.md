@@ -13,6 +13,83 @@ An end-to-end store replenishment solution:
 - A React UI supports quantity adjustment, attribution review, and final submission.
 - SQLite is used for local development; Azure PostgreSQL for multi-replica deployments.
 
+## What It Looks Like
+
+A walkthrough of one full turn of the loop, in the order the system actually runs it.
+Screenshots are from the running application against seeded demo data.
+
+### 1. The engine proposes, and shows its work
+
+Every line carries the `(s, S)` inputs that produced it — demand forecast, safety stock,
+lead time, on-hand and in-transit inventory — so the store manager is arguing with visible
+arithmetic rather than a black box.
+
+![Replenishment suggestions](docs/screenshots/en/suggestions.png)
+
+### 2. The override is gated on a stated reason
+
+Changing a quantity is always allowed, but it is never free. The manager must pick a reason
+from a closed vocabulary and write the specifics. This text is **captured as a claim, not
+accepted as evidence** — it becomes an input the system will later grade, not a fact it trusts.
+
+![Adjusting a quantity and stating a reason](docs/screenshots/en/suggestions-adjust-modal.png)
+
+### 3. Each adjustment opens an attribution case automatically
+
+The run cannot be submitted while any case is unresolved. Re-adjusting a line supersedes its
+old case and invalidates the old approval, so approvals can never drift out of sync with the
+numbers they approved.
+
+![Attribution case queue](docs/screenshots/en/attribution-cases.png)
+
+### 4. The case ledger: what changed, and against what baseline
+
+The counterfactual turns off exactly the causes the model named and recalculates, giving a
+`bare_baseline_qty` that seasonality and holidays can actually be measured against.
+
+![Attribution case detail](docs/screenshots/en/attribution-detail.png)
+
+### 5. The operator's claim is graded against the evidence
+
+The system asks a question the manager cannot answer for himself: *would any value of the
+factor you named actually reproduce the quantity you ordered?* Deterministic code inverts the
+engine to find out. `UNCALIBRATED` here means the stated cause is directionally right but the
+quantity is not reproducible from it — the difference between a reason and an explanation.
+
+![Operator claim verdict and evidence](docs/screenshots/en/attribution-evidence.png)
+
+### 6. Signed allocation with a conservation check
+
+Contributions must sum back to the observed difference. The residual is displayed rather than
+hidden: it is the part of the manager's disagreement that the engine's own assumptions cannot
+account for, which is precisely what knowledge candidates exist to answer.
+
+![Shapley allocation and conservation identity](docs/screenshots/en/attribution-allocation.png)
+
+### 7. The queue that holds the run hostage
+
+Every unresolved case blocks its run from being submitted. Note what the banner says:
+**dismissing is not approving** — it moves the case to Cancelled and leaves the run
+permanently unsubmittable until attribution is re-run. There is no button that makes the
+requirement go away.
+
+![Review queue](docs/screenshots/en/review-queue.png)
+
+### 8. Accepted knowledge feeds the next run
+
+Entries earn weight only as realized sales prove them out. Nothing here was promoted by a
+reviewer's confidence; every weight is a measured outcome.
+
+![Knowledge entries](docs/screenshots/en/knowledge.png)
+
+### 9. Operations view
+
+Worker health, queue depth, case states and lease occupancy — so the loop can be operated
+rather than merely demonstrated. An expired lease is how a worker that died mid-run becomes
+visible instead of silently stalling the queue.
+
+![Admin overview](docs/screenshots/en/admin-overview.png)
+
 ## Core Business Constraint
 
 Whenever a user sets `final_qty` to a value different from `chosen_qty`, an attribution matching the current quantity version must be produced **and** approved by a human before the entire run can be submitted.

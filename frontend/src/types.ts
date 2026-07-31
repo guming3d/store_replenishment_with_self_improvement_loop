@@ -360,6 +360,28 @@ export interface KnowledgeCandidate {
   proposal_version?: string;
 }
 
+export type ClaimVerdict =
+  | 'SUPPORTED'
+  | 'UNCALIBRATED'
+  | 'CONTRADICTED'
+  | 'OUT_OF_SCOPE'
+  | 'UNVERIFIABLE';
+
+/**
+ * The reason the store manager stated, graded against the evidence. Computed by
+ * deterministic code, never by the model — the model is shown the claim and so
+ * cannot grade it independently. Reported only; it moves no quantity.
+ */
+export interface OperatorClaimVerdict {
+  reason_code?: string | null;
+  verdict: ClaimVerdict;
+  claimed_causes: string[];
+  corroborating_causes: string[];
+  /** Causes the evidence backs that the store manager never mentioned. */
+  unclaimed_supported_causes: string[];
+  version?: string;
+}
+
 export interface AttributionReport {
   report_id: string;
   version: number;
@@ -385,6 +407,7 @@ export interface AttributionReport {
   conflicts: string[];
   allocations: AttributionAllocation[];
   knowledge_candidates?: KnowledgeCandidate[];
+  operator_claim?: OperatorClaimVerdict | null;
   evidence: AttributionEvidence[];
   shapley_method: 'exact' | 'sampled' | string;
   shapley_samples?: number | null;

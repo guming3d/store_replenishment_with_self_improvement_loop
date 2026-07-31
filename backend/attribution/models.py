@@ -107,6 +107,11 @@ class AttributionReport(Base):
     version: Mapped[int] = mapped_column(Integer)
     report: Mapped[dict[str, Any]] = mapped_column(_json_type())
     partial: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: Denormalised from ``report["operator_claim"]`` so the concordance summary
+    #: is a grouped scan instead of a JSON walk over every report ever written.
+    #: Null for manual reports, which are written without evidence and so have
+    #: no verdict to record, and for reports predating the verdict.
+    claim_verdict: Mapped[str | None] = mapped_column(String(24), nullable=True)
     source: Mapped[str] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (UniqueConstraint("case_id", "version", name="uq_report_version"),)

@@ -97,6 +97,42 @@ by attribution, review, or knowledge records are retained for audit.
   - `{accepted_total,rejected_total,acceptance_rate,accepted_by_kind,rejected_by_cause}` — the
     diagnostic agents' report card. `rejected_by_cause` tallies the closed reason vocabulary so
     an agent's owner can see *which* way it is wrong, not merely that it was overruled.
+- `GET /api/attribution/claims/feedback?date_from=&date_to=&shop_code=`
+  - `{judged_total,by_verdict,by_reason_code,supported_rate,out_of_scope_total}` — the
+    counterpart report card, for the claim the agents were asked to check (see below).
+
+### The operator's stated reason
+
+Every override carries a `reason_code` and optional `reason_text`. Both are untrusted: the
+coordinator is shown them as `operator_claim` but is forbidden to treat them as proof, and no
+allocation, Shapley value or knowledge value may be derived from them.
+
+The verdict comparing that claim with the evidence is therefore **computed, never asked for**.
+The model sees the claim, so a model asked to grade it would be grading its own anchor. Reports
+carry `operator_claim` from deterministic code instead:
+
+```text
+verdict: SUPPORTED | UNCALIBRATED | CONTRADICTED | OUT_OF_SCOPE | UNVERIFIABLE
+```
+
+`SUPPORTED` requires both that a cause mapped from the reason code was found applicable *and*
+that its knowledge candidate is `acceptable` — i.e. that the engine could be solved to the
+quantity actually ordered. Fluent text cannot make a parameter reach a quantity it cannot reach,
+so the verdict cannot be talked into existence. `UNCALIBRATED` is the applicable-but-unsolvable
+case and, with `CONTRADICTED`, raises the `OPERATOR_CLAIM_UNSUPPORTED` risk flag.
+
+`OUT_OF_SCOPE` is not a failing grade. `DEMAND_CHANGE` and `INVENTORY_CONSTRAINT` map to no
+cause the registry can quantify, so such claims are counted but excluded from `supported_rate`:
+the cause vocabulary fell short there, not the store. A large `out_of_scope_total` is a backlog
+item for attribution — persistent `INVENTORY_CONSTRAINT` claims in particular point at stock
+accuracy, not demand.
+
+`unclaimed_supported_causes` lists causes the evidence backs that the store manager never
+mentioned, so acting on a real signal one cannot name is never counted as a false claim.
+
+The verdict is denormalised onto `attribution_reports.claim_verdict` so the summary groups in
+SQL. It is null for manual reports, which are written without evidence, and those rows are
+excluded from the rate rather than counted as agreement.
 
 ### Knowledge candidates
 

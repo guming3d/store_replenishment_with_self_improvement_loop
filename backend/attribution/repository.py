@@ -1177,6 +1177,64 @@ class AttributionRepository:
                 "rejected_by_cause": by_cause,
             }
 
+    async def claim_verdict_summary(
+        self, *, date_from: datetime | None = None, date_to: datetime | None = None,
+        shop_code: str | None = None,
+    ) -> dict[str, Any]:
+        """How often a stated reason survived contact with the evidence.
+
+        Grouped over the denormalised verdict column rather than the report JSON:
+        the point of the summary is to be cheap enough to look at routinely.
+        Reports without a verdict -- manual attributions and anything written
+        before the verdict existed -- are excluded rather than counted as
+        agreement, so the rate never flatters itself with silence.
+        """
+        async with self.sessions() as session:
+            query = (
+                select(AttributionCase.reason_code, AttributionReport.claim_verdict,
+                       func.count())
+                .join(AttributionCase,
+                      AttributionCase.case_id == AttributionReport.case_id)
+                .where(AttributionReport.claim_verdict.is_not(None))
+                .group_by(AttributionCase.reason_code, AttributionReport.claim_verdict)
+            )
+            if date_from is not None:
+                query = query.where(AttributionReport.created_at >= _as_aware(date_from))
+            if date_to is not None:
+                query = query.where(AttributionReport.created_at <= _as_aware(date_to))
+            if shop_code:
+                query = query.where(AttributionCase.shop_code == shop_code)
+            rows = (await session.execute(query)).all()
+
+            by_reason: dict[str, dict[str, Any]] = {}
+            totals: dict[str, int] = {}
+            for reason_code, verdict, count in rows:
+                bucket = by_reason.setdefault(
+                    str(reason_code), {"total": 0, "verdicts": {}})
+                bucket["total"] += int(count)
+                bucket["verdicts"][str(verdict)] = (
+                    bucket["verdicts"].get(str(verdict), 0) + int(count))
+                totals[str(verdict)] = totals.get(str(verdict), 0) + int(count)
+            for bucket in by_reason.values():
+                # Out-of-scope claims are excluded from the denominator: the
+                # registry, not the store manager, is what failed there, and
+                # leaving them in would read as a store accuracy problem.
+                judged = bucket["total"] - bucket["verdicts"].get("OUT_OF_SCOPE", 0)
+                supported = bucket["verdicts"].get("SUPPORTED", 0)
+                bucket["supported_rate"] = (
+                    round(supported / judged, 4) if judged else None)
+            graded = sum(totals.values()) - totals.get("OUT_OF_SCOPE", 0)
+            return {
+                "judged_total": sum(totals.values()),
+                "by_verdict": totals,
+                "by_reason_code": by_reason,
+                "supported_rate": (
+                    round(totals.get("SUPPORTED", 0) / graded, 4) if graded else None),
+                # Claims the cause registry cannot express at all. A large number
+                # here is a backlog item for attribution, not a store problem.
+                "out_of_scope_total": totals.get("OUT_OF_SCOPE", 0),
+            }
+
     @staticmethod
     def _rejection_dict(row: KnowledgeRejection) -> dict[str, Any]:
         return {
@@ -1540,7 +1598,8 @@ class AttributionRepository:
                 latest = await self._latest_report(session, case_id)
                 saved = AttributionReport(report_id=_id(), case_id=case_id,
                     version=(latest.version if latest else 0) + 1, report=report, partial=partial,
-                    source="AGENT", created_at=now)
+                    source="AGENT", created_at=now,
+                    claim_verdict=(report.get("operator_claim") or {}).get("verdict"))
                 session.add(saved)
                 attempt.state = "SUCCEEDED"
                 case.state, case.partial = CaseState.NEEDS_REVIEW, partial
@@ -1819,6 +1878,7 @@ class AttributionRepository:
             "conflicts": payload.get("conflicts", []),
             "allocations": allocations,
             "knowledge_candidates": payload.get("knowledge_candidates", []),
+            "operator_claim": payload.get("operator_claim"),
             "evidence": payload.get("evidence", []),
             "shapley_method": payload.get("shapley_method", shapley.get("method", "exact")),
             "shapley_samples": payload.get("shapley_samples", shapley.get("sample_count")),
