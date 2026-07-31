@@ -1,0 +1,17 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.11.7
+python-dotenv==1.0.1
+# Agent-orchestrated path (Microsoft Agent Framework + Foundry). Optional at runtime:
+# the deterministic engine works without these; the "Agent 编排" toggle needs only the
+# framework core plus the Foundry adapter — not the meta package with all optional extras.
+# Harness APIs are supplied by core; Foundry adapter versions intentionally do not track core.
+agent-framework-core==1.12.0
+agent-framework-foundry==1.10.2
+azure-identity==1.25.3
+SQLAlchemy==2.0.41
+alembic==1.16.4
+aiosqlite==0.21.0
+asyncpg==0.30.0
+pytest==8.4.1
+pytest-asyncio==1.1.0

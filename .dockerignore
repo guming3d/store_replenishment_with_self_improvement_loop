@@ -1,0 +1,14 @@
+*
+!backend/
+!backend/**
+!forecasting_cache/
+!forecasting_cache/**
+
+backend/.env
+backend/.pytest_cache/
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/tests/
+backend/attribution.db
+backend/*.log

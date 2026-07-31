@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "projectName": {
+      "value": "store-replenishment"
+    },
+    "environmentName": {
+      "value": "prod"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "acrName": {
+      "value": "crstorereplenishmentprod"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "store-replenishment-law"
+    },
+    "applicationInsightsName": {
+      "value": "store-replenishment-appi"
+    },
+    "containerAppsEnvironmentName": {
+      "value": "store-replenishment-aca-env"
+    },
+    "backendAppName": {
+      "value": "store-replenishment-backend"
+    },
+    "frontendAppName": {
+      "value": "store-replenishment-frontend"
+    },
+    "backendContainerImage": {
+      "value": "${SERVICE_BACKEND_IMAGE_NAME}"
+    },
+    "frontendContainerImage": {
+      "value": "${SERVICE_FRONTEND_IMAGE_NAME}"
+    },
+    "demoUsername": {
+      "value": "${REPLENISH_DEMO_USERNAME}"
+    },
+    "demoPassword": {
+      "value": "${REPLENISH_DEMO_PASSWORD}"
+    },
+    "adminUsername": {
+      "value": "${REPLENISH_ADMIN_USERNAME}"
+    },
+    "adminPassword": {
+      "value": "${REPLENISH_ADMIN_PASSWORD}"
+    },
+    "foundryProjectEndpoint": {
+      "value": "${FOUNDRY_PROJECT_ENDPOINT}"
+    },
+    "foundryModelDeployment": {
+      "value": "${FOUNDRY_MODEL_DEPLOYMENT}"
+    }
+  }
+}

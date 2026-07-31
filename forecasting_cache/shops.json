@@ -1,0 +1,1142 @@
+[
+  {
+    "shop_code": "1011",
+    "shop_name": "古城店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1012",
+    "shop_name": "西门店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1014",
+    "shop_name": "八角北里店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1016",
+    "shop_name": "昌平店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1019",
+    "shop_name": "科大店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1020",
+    "shop_name": "小云岗店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1021",
+    "shop_name": "云岗店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1023",
+    "shop_name": "新隆店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1024",
+    "shop_name": "北大地店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1025",
+    "shop_name": "旧宫店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1027",
+    "shop_name": "建兴店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1028",
+    "shop_name": "天通苑店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1033",
+    "shop_name": "榆垡店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1041",
+    "shop_name": "宋庄店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1044",
+    "shop_name": "永乐店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1058",
+    "shop_name": "北大店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1066",
+    "shop_name": "丰台东大街店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1067",
+    "shop_name": "丰台光大店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1068",
+    "shop_name": "丰台乐园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1069",
+    "shop_name": "丰台马家堡店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1071",
+    "shop_name": "丰台太平桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1072",
+    "shop_name": "丰台卢沟桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1074",
+    "shop_name": "丰台新华东店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1077",
+    "shop_name": "丰台燕南店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1079",
+    "shop_name": "丰台方星园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1080",
+    "shop_name": "蒲黄榆店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1084",
+    "shop_name": "三家店店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1122",
+    "shop_name": "甘棠店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1129",
+    "shop_name": "鼓楼店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1154",
+    "shop_name": "崇菜崇文门店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1156",
+    "shop_name": "天东店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1159",
+    "shop_name": "南线阁店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1163",
+    "shop_name": "惠新店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1164",
+    "shop_name": "志新店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1166",
+    "shop_name": "华天店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1170",
+    "shop_name": "新街口店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1171",
+    "shop_name": "中关村店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1197",
+    "shop_name": "大江路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1209",
+    "shop_name": "宏源店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1214",
+    "shop_name": "贵阳路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1224",
+    "shop_name": "时代店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1248",
+    "shop_name": "回龙观东店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1251",
+    "shop_name": "交道口店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1252",
+    "shop_name": "新兴里店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1264",
+    "shop_name": "万源店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1267",
+    "shop_name": "朝菜店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1271",
+    "shop_name": "汉沽店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1279",
+    "shop_name": "通州梨园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1284",
+    "shop_name": "总参店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1288",
+    "shop_name": "天津杨柳青店(关店)",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1289",
+    "shop_name": "水木天成店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1290",
+    "shop_name": "中北店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1292",
+    "shop_name": "新华联家园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1301",
+    "shop_name": "西山枫林店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1309",
+    "shop_name": "丰体时代店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1310",
+    "shop_name": "密云果园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1312",
+    "shop_name": "开阳桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1313",
+    "shop_name": "玉蜓桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1314",
+    "shop_name": "枣园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1324",
+    "shop_name": "白纸坊店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1325",
+    "shop_name": "马家堡店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1328",
+    "shop_name": "德胜门店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1330",
+    "shop_name": "三里河店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1332",
+    "shop_name": "和平新城店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1334",
+    "shop_name": "安外店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1335",
+    "shop_name": "亦庄店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1336",
+    "shop_name": "百旺店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1339",
+    "shop_name": "时代风帆店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1343",
+    "shop_name": "鲁谷店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1345",
+    "shop_name": "西安门店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1347",
+    "shop_name": "回龙观一店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1352",
+    "shop_name": "新龙店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1353",
+    "shop_name": "房山北关店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1354",
+    "shop_name": "良乡店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1356",
+    "shop_name": "燕山店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1361",
+    "shop_name": "华苑店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1364",
+    "shop_name": "北沙滩店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1370",
+    "shop_name": "北太平庄店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1373",
+    "shop_name": "顺义仁和店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1378",
+    "shop_name": "双峪环岛店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1387",
+    "shop_name": "通州龙湖店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1389",
+    "shop_name": "北七家店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1391",
+    "shop_name": "通州三间房店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1408",
+    "shop_name": "甘露园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1411",
+    "shop_name": "加州小镇店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1420",
+    "shop_name": "西黄村二店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1421",
+    "shop_name": "静海店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1427",
+    "shop_name": "兴华大街店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1429",
+    "shop_name": "葛沽店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1431",
+    "shop_name": "温都水城店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1433",
+    "shop_name": "明光桥西店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1434",
+    "shop_name": "陶然亭店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1443",
+    "shop_name": "高米店北店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1447",
+    "shop_name": "朝阳门店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1450",
+    "shop_name": "大成店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1451",
+    "shop_name": "远洋一方店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1452",
+    "shop_name": "望京麒麟社店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1454",
+    "shop_name": "西三旗店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1456",
+    "shop_name": "田村店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1457",
+    "shop_name": "太阳岛店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1468",
+    "shop_name": "丁字沽店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1477",
+    "shop_name": "联想桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1482",
+    "shop_name": "北苑东店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1485",
+    "shop_name": "泰河园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1490",
+    "shop_name": "宣化店",
+    "city": "张家口市"
+  },
+  {
+    "shop_code": "1492",
+    "shop_name": "后沙峪店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1509",
+    "shop_name": "南海家园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1512",
+    "shop_name": "三旗百汇店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1516",
+    "shop_name": "小汤山店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1517",
+    "shop_name": "天洋城店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1518",
+    "shop_name": "西南角店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1526",
+    "shop_name": "马驹桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1530",
+    "shop_name": "安河桥北店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1536",
+    "shop_name": "朱家坟店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1538",
+    "shop_name": "冯村店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1539",
+    "shop_name": "沙城店",
+    "city": "张家口市"
+  },
+  {
+    "shop_code": "1546",
+    "shop_name": "梅江店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1552",
+    "shop_name": "杜家坎店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1557",
+    "shop_name": "石门营店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1562",
+    "shop_name": "万寿路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1565",
+    "shop_name": "中信城店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1571",
+    "shop_name": "固安店",
+    "city": "廊坊市"
+  },
+  {
+    "shop_code": "1573",
+    "shop_name": "沙河店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1574",
+    "shop_name": "昌平西关店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1575",
+    "shop_name": "通州次渠店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1579",
+    "shop_name": "沁山水店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1582",
+    "shop_name": "光明楼店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1593",
+    "shop_name": "大兴龙湖店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1612",
+    "shop_name": "军科院一店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1621",
+    "shop_name": "河滩店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1624",
+    "shop_name": "密云新中街店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1628",
+    "shop_name": "丽泽桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1629",
+    "shop_name": "港东店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1632",
+    "shop_name": "紫竹院店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1633",
+    "shop_name": "潘家园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1635",
+    "shop_name": "金宝街店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1647",
+    "shop_name": "木樨园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1649",
+    "shop_name": "潭柘新区店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1654",
+    "shop_name": "燕郊方舟店",
+    "city": "廊坊市"
+  },
+  {
+    "shop_code": "1658",
+    "shop_name": "温泉品超市",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1659",
+    "shop_name": "康庄路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1666",
+    "shop_name": "樊羊路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1669",
+    "shop_name": "海北路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1673",
+    "shop_name": "华业玫瑰店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1679",
+    "shop_name": "密云万象汇店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1691",
+    "shop_name": "庞各庄店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1699",
+    "shop_name": "怀柔万达店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1700",
+    "shop_name": "星光天地店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1713",
+    "shop_name": "北太平路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1721",
+    "shop_name": "广安门内店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1724",
+    "shop_name": "昌平南环路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1727",
+    "shop_name": "太平桥西店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1737",
+    "shop_name": "鲁谷东店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1738",
+    "shop_name": "京港城店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1740",
+    "shop_name": "双井店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1748",
+    "shop_name": "孙河店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1754",
+    "shop_name": "顺义马坡店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1774",
+    "shop_name": "通讯大院店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1776",
+    "shop_name": "五马路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1791",
+    "shop_name": "涿州店",
+    "city": "保定市"
+  },
+  {
+    "shop_code": "1795",
+    "shop_name": "衙门口桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1797",
+    "shop_name": "洋桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1798",
+    "shop_name": "上地店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1801",
+    "shop_name": "十里堡店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1803",
+    "shop_name": "白石桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1804",
+    "shop_name": "安贞店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1805",
+    "shop_name": "酒仙桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1806",
+    "shop_name": "玉兴园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1808",
+    "shop_name": "公益西桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1842",
+    "shop_name": "嘉陵道店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1846",
+    "shop_name": "西营门店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1859",
+    "shop_name": "天达路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1864",
+    "shop_name": "江水道店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1879",
+    "shop_name": "贻成福地店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1882",
+    "shop_name": "京平店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1883",
+    "shop_name": "北洼路二店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1888",
+    "shop_name": "定福庄店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1892",
+    "shop_name": "窦店北路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2048",
+    "shop_name": "创新路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2062",
+    "shop_name": "嘉华港湾店",
+    "city": "廊坊市"
+  },
+  {
+    "shop_code": "2065",
+    "shop_name": "东坝恒大店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2114",
+    "shop_name": "昌平南邵店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2124",
+    "shop_name": "门头沟龙湖店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2146",
+    "shop_name": "黄寺街东店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2147",
+    "shop_name": "黄寺街西店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2148",
+    "shop_name": "复兴路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2155",
+    "shop_name": "润旭广场店",
+    "city": "廊坊市"
+  },
+  {
+    "shop_code": "2156",
+    "shop_name": "西翠路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2157",
+    "shop_name": "太平路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2169",
+    "shop_name": "阳坊营区店(筹备中)",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2170",
+    "shop_name": "地安门内店(筹备中)",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2171",
+    "shop_name": "东郊民巷店(筹备中)",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2172",
+    "shop_name": "苍南胡同店(筹备中)",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2175",
+    "shop_name": "金街店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "2176",
+    "shop_name": "新港店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "2177",
+    "shop_name": "开发区店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "2186",
+    "shop_name": "北师大店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2212",
+    "shop_name": "航天城品超",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2218",
+    "shop_name": "燕新大街店",
+    "city": "廊坊市"
+  },
+  {
+    "shop_code": "2219",
+    "shop_name": "晓月苑店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2225",
+    "shop_name": "温泉凯盛店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2226",
+    "shop_name": "星光汇店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "2235",
+    "shop_name": "闵庄南路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2236",
+    "shop_name": "甘李药业店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2238",
+    "shop_name": "玉桥中路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2242",
+    "shop_name": "华泰路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "2243",
+    "shop_name": "西翠路东店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2245",
+    "shop_name": "莲花桥店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2246",
+    "shop_name": "朗清园店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2253",
+    "shop_name": "津沽路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "2265",
+    "shop_name": "草桥东路店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2276",
+    "shop_name": "南开大学店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "8501",
+    "shop_name": "华贸品超市店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "1190",
+    "shop_name": "增产道店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1191",
+    "shop_name": "真理道店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1192",
+    "shop_name": "北食店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1196",
+    "shop_name": "靖江桥店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1202",
+    "shop_name": "书苑店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1205",
+    "shop_name": "佳园里店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1210",
+    "shop_name": "大桥道店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1860",
+    "shop_name": "辰旺路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1861",
+    "shop_name": "三潭路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1863",
+    "shop_name": "迎风道店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1865",
+    "shop_name": "八经路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "2019",
+    "shop_name": "本溪路店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "2116",
+    "shop_name": "玉林里店",
+    "city": "北京城区"
+  },
+  {
+    "shop_code": "2145",
+    "shop_name": "晨光道店",
+    "city": "天津城区"
+  },
+  {
+    "shop_code": "1606",
+    "shop_name": "天翠阳光店",
+    "city": "北京城区"
+  }
+]

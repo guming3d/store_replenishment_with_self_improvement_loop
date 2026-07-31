@@ -1,0 +1,22 @@
+{
+  "version": "substitution-seed-v2",
+  "description": "Readonly substitution relationships. One row per (target, substitute) ordered pair; add both directions when the transfer is mutual. relationship_direction is +1 when pressure on the substitute pushes demand ONTO the target, -1 when it pulls demand away. transfer_rate is the share of the substitute's reconstructed daily demand that moves at full pressure; max_transfer_ratio caps the transfer as a share of the target's own daily demand.",
+  "relationships": [
+    {
+      "target_goods_code": "653270",
+      "substitute_goods_code": "653269",
+      "relationship_direction": 1,
+      "transfer_rate": 0.45,
+      "max_transfer_ratio": 0.6,
+      "note": "三全珍味三鲜上汤小云吞 与 三全荠菜猪肉上汤小云吞 同品牌同规格同价位，货架相邻，缺一补一"
+    },
+    {
+      "target_goods_code": "653269",
+      "substitute_goods_code": "653270",
+      "relationship_direction": 1,
+      "transfer_rate": 0.45,
+      "max_transfer_ratio": 0.6,
+      "note": "反向同理：珍味三鲜断货时顾客转向荠菜猪肉口味"
+    }
+  ]
+}

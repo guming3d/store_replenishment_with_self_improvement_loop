@@ -1,0 +1,44 @@
+# Audio source recordings (large binaries — keep out of git)
+*.m4a
+*.wav
+*.mp3
+.export_build/
+
+# Transcription working artifacts
+_work/
+
+# OS / editor
+Thumbs.db
+.DS_Store
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Local run history (regenerated at runtime)
+run_history.json
+
+# Local SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Local replenishment parameter config (written at runtime via the config API)
+replenishment_config.json
+
+# Large input data (regenerate cache from CSV locally)
+agent_poc/input_data/*.csv
+
+# Backups
+*.bak
+docx_backups/
+
+inventory_overrides.json

@@ -1,0 +1,10 @@
+{
+  "version": "seasonality-seed-v1",
+  "description": "Readonly seasonal evidence. SKU entries override category entries.",
+  "sku": {},
+  "category": {
+    "果汁饮料": {"6": 1.25, "7": 1.25, "8": 1.25},
+    "啤酒": {"6": 1.25, "7": 1.25, "8": 1.25},
+    "水饺/馄饨": {"12": 1.3, "1": 1.3, "2": 1.3}
+  }
+}

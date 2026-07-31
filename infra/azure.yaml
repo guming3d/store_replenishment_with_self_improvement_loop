@@ -1,0 +1,22 @@
+name: store-replenishment
+metadata:
+  template: store-replenishment
+
+infra:
+  provider: bicep
+  path: .
+
+services:
+  backend:
+    project: ../backend
+    host: containerapp
+    docker:
+      path: ../backend/Dockerfile
+      context: ../backend
+
+  frontend:
+    project: ../frontend
+    host: containerapp
+    docker:
+      path: ../frontend/Dockerfile
+      context: ../frontend

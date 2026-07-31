@@ -1,0 +1,775 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.44.1.10279",
+      "templateHash": "9777057508078780545"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources."
+      }
+    },
+    "projectName": {
+      "type": "string",
+      "defaultValue": "store-replenishment",
+      "metadata": {
+        "description": "Short project name used in resource names and tags."
+      }
+    },
+    "environmentName": {
+      "type": "string",
+      "defaultValue": "prod",
+      "metadata": {
+        "description": "Deployment environment name, for example dev, staging, or prod."
+      }
+    },
+    "acrName": {
+      "type": "string",
+      "defaultValue": "[take(toLower(replace(format('cr{0}{1}{2}', parameters('projectName'), parameters('environmentName'), uniqueString(resourceGroup().id)), '-', '')), 50)]",
+      "metadata": {
+        "description": "Azure Container Registry name. Must be globally unique and alphanumeric."
+      }
+    },
+    "logAnalyticsWorkspaceName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-{1}-law', parameters('projectName'), parameters('environmentName'))]",
+      "metadata": {
+        "description": "Log Analytics workspace name."
+      }
+    },
+    "applicationInsightsName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-{1}-appi', parameters('projectName'), parameters('environmentName'))]",
+      "metadata": {
+        "description": "Application Insights component name."
+      }
+    },
+    "containerAppsEnvironmentName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-{1}-aca-env', parameters('projectName'), parameters('environmentName'))]",
+      "metadata": {
+        "description": "Azure Container Apps managed environment name."
+      }
+    },
+    "backendAppName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-{1}-backend', parameters('projectName'), parameters('environmentName'))]",
+      "metadata": {
+        "description": "Backend Container App name."
+      }
+    },
+    "frontendAppName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-{1}-frontend', parameters('projectName'), parameters('environmentName'))]",
+      "metadata": {
+        "description": "Frontend Container App name."
+      }
+    },
+    "migrationJobName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-{1}-migrate', parameters('projectName'), parameters('environmentName'))]",
+      "metadata": {
+        "description": "Database migration Container Apps Job name."
+      }
+    },
+    "databaseIdentityName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-{1}-db-identity', parameters('projectName'), parameters('environmentName'))]",
+      "metadata": {
+        "description": "User-assigned identity shared by the backend and database migration job."
+      }
+    },
+    "postgresServerName": {
+      "type": "string",
+      "defaultValue": "[take(toLower(replace(format('psql-{0}-{1}-{2}', parameters('projectName'), parameters('environmentName'), uniqueString(resourceGroup().id)), '_', '-')), 63)]",
+      "metadata": {
+        "description": "Azure Database for PostgreSQL Flexible Server name."
+      }
+    },
+    "postgresDatabaseName": {
+      "type": "string",
+      "defaultValue": "replenishment",
+      "metadata": {
+        "description": "Application database name."
+      }
+    },
+    "backendContainerImage": {
+      "type": "string",
+      "defaultValue": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+      "metadata": {
+        "description": "Initial backend container image. Scripts update this to the ACR image after build/push."
+      }
+    },
+    "frontendContainerImage": {
+      "type": "string",
+      "defaultValue": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+      "metadata": {
+        "description": "Initial frontend container image. Scripts update this to the ACR image after build/push."
+      }
+    },
+    "backendTargetPort": {
+      "type": "int",
+      "defaultValue": 8000,
+      "metadata": {
+        "description": "Backend application port."
+      }
+    },
+    "frontendTargetPort": {
+      "type": "int",
+      "defaultValue": 80,
+      "metadata": {
+        "description": "Frontend application port."
+      }
+    },
+    "keyVaultName": {
+      "type": "string",
+      "defaultValue": "[take(toLower(replace(format('kv{0}{1}{2}', parameters('projectName'), parameters('environmentName'), uniqueString(resourceGroup().id)), '-', '')), 24)]",
+      "metadata": {
+        "description": "Key Vault name for shared application configuration and future secret storage."
+      }
+    },
+    "foundryProjectEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Foundry project endpoint for agent orchestration. Leave empty to keep agent mode disabled."
+      }
+    },
+    "foundryModelDeployment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Foundry model deployment for agent orchestration. Leave empty to keep agent mode disabled."
+      }
+    },
+    "authTokenSecret": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Signing secret for the demo API bearer token. Override for shared environments."
+      }
+    },
+    "demoUsername": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Demo login username for deployed environments. Leave empty to disable cloud login until explicitly configured."
+      }
+    },
+    "demoPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Demo login password for deployed environments. Leave empty to disable cloud login until explicitly configured."
+      }
+    },
+    "adminUsername": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Administrator login username. Leave empty to disable the admin console in this environment."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Administrator login password. Leave empty to disable the admin console in this environment."
+      }
+    }
+  },
+  "variables": {
+    "tags": {
+      "application": "[parameters('projectName')]",
+      "environment": "[parameters('environmentName')]",
+      "workload": "store-replenishment"
+    },
+    "effectiveAuthTokenSecret": "[if(empty(parameters('authTokenSecret')), uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('backendAppName'), 'replenishment-auth'), parameters('authTokenSecret'))]",
+    "demoCredentialSecrets": "[concat(if(empty(parameters('demoUsername')), createArray(), createArray(createObject('name', 'demo-username', 'value', parameters('demoUsername')))), if(empty(parameters('demoPassword')), createArray(), createArray(createObject('name', 'demo-password', 'value', parameters('demoPassword')))), if(empty(parameters('adminUsername')), createArray(), createArray(createObject('name', 'admin-username', 'value', parameters('adminUsername')))), if(empty(parameters('adminPassword')), createArray(), createArray(createObject('name', 'admin-password', 'value', parameters('adminPassword')))))]",
+    "demoCredentialEnv": "[concat(if(empty(parameters('demoUsername')), createArray(), createArray(createObject('name', 'REPLENISH_DEMO_USERNAME', 'secretRef', 'demo-username'))), if(empty(parameters('demoPassword')), createArray(), createArray(createObject('name', 'REPLENISH_DEMO_PASSWORD', 'secretRef', 'demo-password'))), if(empty(parameters('adminUsername')), createArray(), createArray(createObject('name', 'REPLENISH_ADMIN_USERNAME', 'secretRef', 'admin-username'))), if(empty(parameters('adminPassword')), createArray(), createArray(createObject('name', 'REPLENISH_ADMIN_PASSWORD', 'secretRef', 'admin-password'))))]",
+    "acrPullRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[parameters('logAnalyticsWorkspaceName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30,
+        "features": {
+          "enableLogAccessUsingOnlyResourcePermissions": true
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[parameters('applicationInsightsName')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "enableRbacAuthorization": true,
+        "enablePurgeProtection": true,
+        "publicNetworkAccess": "Enabled",
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "softDeleteRetentionInDays": 90,
+        "tenantId": "[tenant().tenantId]"
+      }
+    },
+    {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('acrName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "adminUserEnabled": false,
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('containerAppsEnvironmentName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName')), '2023-09-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName')), '2023-09-01').primarySharedKey]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[parameters('databaseIdentityName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]"
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+      "apiVersion": "2024-08-01",
+      "name": "[parameters('postgresServerName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard_B1ms",
+        "tier": "Burstable"
+      },
+      "properties": {
+        "version": "16",
+        "administratorLogin": "",
+        "authConfig": {
+          "activeDirectoryAuth": "Enabled",
+          "passwordAuth": "Disabled",
+          "tenantId": "[tenant().tenantId]"
+        },
+        "backup": {
+          "backupRetentionDays": 7,
+          "geoRedundantBackup": "Disabled"
+        },
+        "highAvailability": {
+          "mode": "Disabled"
+        },
+        "network": {
+          "publicNetworkAccess": "Enabled"
+        },
+        "storage": {
+          "storageSizeGB": 32,
+          "autoGrow": "Enabled"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+      "apiVersion": "2024-08-01",
+      "name": "[format('{0}/{1}', parameters('postgresServerName'), parameters('postgresDatabaseName'))]",
+      "properties": {
+        "charset": "UTF8",
+        "collation": "en_US.utf8"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+      "apiVersion": "2024-08-01",
+      "name": "[format('{0}/{1}', parameters('postgresServerName'), 'AllowAzureServices')]",
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('backendAppName')]",
+      "location": "[parameters('location')]",
+      "tags": "[union(variables('tags'), createObject('azd-service-name', 'backend'))]",
+      "identity": {
+        "type": "SystemAssigned, UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName')))]": {}
+        }
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]",
+        "configuration": {
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]",
+              "identity": "system"
+            }
+          ],
+          "secrets": "[concat(createArray(createObject('name', 'auth-token-secret', 'value', variables('effectiveAuthTokenSecret'))), variables('demoCredentialSecrets'))]",
+          "ingress": {
+            "external": false,
+            "targetPort": "[parameters('backendTargetPort')]",
+            "transport": "auto",
+            "allowInsecure": false
+          }
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "backend",
+              "image": "[parameters('backendContainerImage')]",
+              "env": "[concat(createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString), createObject('name', 'APPLICATIONINSIGHTS_ROLE_NAME', 'value', 'backend'), createObject('name', 'FOUNDRY_PROJECT_ENDPOINT', 'value', parameters('foundryProjectEndpoint')), createObject('name', 'FOUNDRY_MODEL_DEPLOYMENT', 'value', parameters('foundryModelDeployment')), createObject('name', 'AZURE_USE_MANAGED_IDENTITY', 'value', 'true'), createObject('name', 'ATTRIBUTION_POSTGRES_MANAGED_IDENTITY_CLIENT_ID', 'value', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName')), '2023-01-31').clientId), createObject('name', 'ATTRIBUTION_DATABASE_URL', 'value', format('postgresql+asyncpg://{0}@{1}:5432/{2}?ssl=require', parameters('databaseIdentityName'), reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName')), '2024-08-01').fullyQualifiedDomainName, parameters('postgresDatabaseName'))), createObject('name', 'ATTRIBUTION_POSTGRES_ENTRA_AUTH', 'value', 'true'), createObject('name', 'ATTRIBUTION_RUN_MIGRATIONS_ON_STARTUP', 'value', 'true'), createObject('name', 'ATTRIBUTION_WORKER_CONCURRENCY', 'value', '4'), createObject('name', 'ATTRIBUTION_AUTO_PUBLISH', 'value', 'false'), createObject('name', 'REPLENISH_AUTH_SECRET', 'secretRef', 'auth-token-secret')), variables('demoCredentialEnv'))]",
+              "probes": [
+                {
+                  "type": "startup",
+                  "httpGet": {
+                    "path": "/api/health",
+                    "port": "[parameters('backendTargetPort')]"
+                  },
+                  "initialDelaySeconds": 0,
+                  "periodSeconds": 10,
+                  "failureThreshold": 30
+                },
+                {
+                  "type": "liveness",
+                  "httpGet": {
+                    "path": "/api/health",
+                    "port": "[parameters('backendTargetPort')]"
+                  },
+                  "initialDelaySeconds": 10,
+                  "periodSeconds": 30,
+                  "failureThreshold": 3
+                },
+                {
+                  "type": "readiness",
+                  "httpGet": {
+                    "path": "/api/health",
+                    "port": "[parameters('backendTargetPort')]"
+                  },
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 10,
+                  "failureThreshold": 3
+                }
+              ],
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              }
+            }
+          ],
+          "scale": {
+            "minReplicas": 2,
+            "maxReplicas": 3
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName'))]",
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/jobs",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('migrationJobName')]",
+      "location": "[parameters('location')]",
+      "tags": "[union(variables('tags'), createObject('azd-service-name', 'migration'))]",
+      "identity": {
+        "type": "SystemAssigned, UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName')))]": {}
+        }
+      },
+      "properties": {
+        "environmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]",
+        "configuration": {
+          "triggerType": "Manual",
+          "replicaTimeout": 1800,
+          "replicaRetryLimit": 1,
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]",
+              "identity": "system"
+            }
+          ],
+          "manualTriggerConfig": {
+            "parallelism": 1,
+            "replicaCompletionCount": 1
+          }
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "migration",
+              "image": "[parameters('backendContainerImage')]",
+              "command": [
+                "/bin/sh"
+              ],
+              "args": [
+                "-c",
+                "alembic -c /app/backend/alembic.ini upgrade head"
+              ],
+              "env": [
+                {
+                  "name": "AZURE_USE_MANAGED_IDENTITY",
+                  "value": "true"
+                },
+                {
+                  "name": "ATTRIBUTION_POSTGRES_MANAGED_IDENTITY_CLIENT_ID",
+                  "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName')), '2023-01-31').clientId]"
+                },
+                {
+                  "name": "ATTRIBUTION_DATABASE_URL",
+                  "value": "[format('postgresql+asyncpg://{0}@{1}:5432/{2}?ssl=require', parameters('databaseIdentityName'), reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName')), '2024-08-01').fullyQualifiedDomainName, parameters('postgresDatabaseName'))]"
+                },
+                {
+                  "name": "ATTRIBUTION_POSTGRES_ENTRA_AUTH",
+                  "value": "true"
+                }
+              ],
+              "resources": {
+                "cpu": "[json('0.25')]",
+                "memory": "0.5Gi"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName'))]",
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))]",
+        "[resourceId('Microsoft.Resources/deployments', 'postgres-administrator')]",
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/databases', parameters('postgresServerName'), parameters('postgresDatabaseName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('frontendAppName')]",
+      "location": "[parameters('location')]",
+      "tags": "[union(variables('tags'), createObject('azd-service-name', 'frontend'))]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]",
+        "configuration": {
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]",
+              "identity": "system"
+            }
+          ],
+          "ingress": {
+            "external": true,
+            "targetPort": "[parameters('frontendTargetPort')]",
+            "transport": "auto",
+            "allowInsecure": false
+          }
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "frontend",
+              "image": "[parameters('frontendContainerImage')]",
+              "env": [
+                {
+                  "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                  "value": "[reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString]"
+                },
+                {
+                  "name": "APPLICATIONINSIGHTS_ROLE_NAME",
+                  "value": "frontend"
+                },
+                {
+                  "name": "BACKEND_UPSTREAM",
+                  "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', parameters('backendAppName')), '2024-03-01').configuration.ingress.fqdn)]"
+                }
+              ],
+              "probes": [
+                {
+                  "type": "startup",
+                  "httpGet": {
+                    "path": "/",
+                    "port": "[parameters('frontendTargetPort')]"
+                  },
+                  "initialDelaySeconds": 0,
+                  "periodSeconds": 10,
+                  "failureThreshold": 30
+                },
+                {
+                  "type": "liveness",
+                  "httpGet": {
+                    "path": "/",
+                    "port": "[parameters('frontendTargetPort')]"
+                  },
+                  "initialDelaySeconds": 10,
+                  "periodSeconds": 30,
+                  "failureThreshold": 3
+                },
+                {
+                  "type": "readiness",
+                  "httpGet": {
+                    "path": "/",
+                    "port": "[parameters('frontendTargetPort')]"
+                  },
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 10,
+                  "failureThreshold": 3
+                }
+              ],
+              "resources": {
+                "cpu": "[json('0.25')]",
+                "memory": "0.5Gi"
+              }
+            }
+          ],
+          "scale": {
+            "minReplicas": 0,
+            "maxReplicas": 2
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+        "[resourceId('Microsoft.App/containerApps', parameters('backendAppName'))]",
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('backendAppName'), 'backend-acrpull')]",
+      "properties": {
+        "roleDefinitionId": "[variables('acrPullRoleDefinitionId')]",
+        "principalId": "[reference(resourceId('Microsoft.App/containerApps', parameters('backendAppName')), '2024-03-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "[resourceId('Microsoft.App/containerApps', parameters('backendAppName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('frontendAppName'), 'frontend-acrpull')]",
+      "properties": {
+        "roleDefinitionId": "[variables('acrPullRoleDefinitionId')]",
+        "principalId": "[reference(resourceId('Microsoft.App/containerApps', parameters('frontendAppName')), '2024-03-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "[resourceId('Microsoft.App/containerApps', parameters('frontendAppName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('migrationJobName'), 'migration-acrpull')]",
+      "properties": {
+        "roleDefinitionId": "[variables('acrPullRoleDefinitionId')]",
+        "principalId": "[reference(resourceId('Microsoft.App/jobs', parameters('migrationJobName')), '2024-03-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "[resourceId('Microsoft.App/jobs', parameters('migrationJobName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "postgres-administrator",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "serverName": {
+            "value": "[parameters('postgresServerName')]"
+          },
+          "administratorObjectId": {
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName')), '2023-01-31').principalId]"
+          },
+          "principalName": {
+            "value": "[parameters('databaseIdentityName')]"
+          },
+          "tenantId": {
+            "value": "[tenant().tenantId]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.44.1.10279",
+              "templateHash": "12432669540303512681"
+            }
+          },
+          "parameters": {
+            "serverName": {
+              "type": "string"
+            },
+            "administratorObjectId": {
+              "type": "string"
+            },
+            "principalName": {
+              "type": "string"
+            },
+            "tenantId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/administrators",
+              "apiVersion": "2024-08-01",
+              "name": "[format('{0}/{1}', parameters('serverName'), parameters('administratorObjectId'))]",
+              "properties": {
+                "principalName": "[parameters('principalName')]",
+                "principalType": "ServicePrincipal",
+                "tenantId": "[parameters('tenantId')]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName'))]",
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "AZURE_CONTAINER_REGISTRY_NAME": {
+      "type": "string",
+      "value": "[parameters('acrName')]"
+    },
+    "AZURE_CONTAINER_REGISTRY_ENDPOINT": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]"
+    },
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString]"
+    },
+    "KEYVAULT_NAME": {
+      "type": "string",
+      "value": "[parameters('keyVaultName')]"
+    },
+    "KEYVAULT_URI": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri]"
+    },
+    "BACKEND_CONTAINER_APP_NAME": {
+      "type": "string",
+      "value": "[parameters('backendAppName')]"
+    },
+    "FRONTEND_CONTAINER_APP_NAME": {
+      "type": "string",
+      "value": "[parameters('frontendAppName')]"
+    },
+    "BACKEND_CONTAINER_APP_FQDN": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('backendAppName')), '2024-03-01').configuration.ingress.fqdn]"
+    },
+    "FRONTEND_CONTAINER_APP_FQDN": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('frontendAppName')), '2024-03-01').configuration.ingress.fqdn]"
+    },
+    "FRONTEND_CONTAINER_APP_URL": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', parameters('frontendAppName')), '2024-03-01').configuration.ingress.fqdn)]"
+    },
+    "MIGRATION_JOB_NAME": {
+      "type": "string",
+      "value": "[parameters('migrationJobName')]"
+    },
+    "POSTGRES_SERVER_FQDN": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName')), '2024-08-01').fullyQualifiedDomainName]"
+    },
+    "POSTGRES_DATABASE_NAME": {
+      "type": "string",
+      "value": "[parameters('postgresDatabaseName')]"
+    },
+    "DATABASE_IDENTITY_CLIENT_ID": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('databaseIdentityName')), '2023-01-31').clientId]"
+    }
+  }
+}
