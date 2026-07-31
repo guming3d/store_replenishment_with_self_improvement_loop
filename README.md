@@ -1,175 +1,160 @@
-# Agentic 门店补货与归因系统
+# Agentic Store Replenishment & Attribution System
 
-这是一个端到端门店补货方案：
+**Language:** **English (current)** · [中文](README.zh-CN.md)
 
-- 确定性 `(s, S)` 补货引擎生成可审计的 SKU 建议量。
-- Microsoft Agent Framework 负责补货 Agent 编排。
-- Harness 归因协调器调用受限的季节/节假日和替代关系诊断能力。
-- 确定性反事实回放、Shapley 分配和守恒校验负责因果算量。
-- 日销量回流形成决策结果台账，用实际需求同时评判系统建议量和人工修改量。
-- 知识条目按门店/SKU 维度沉淀，并依据实测准确率逐步获得权重。
-- React UI 支持补货数量调整、归因审核和最终提交。
-- SQLite 用于本地开发，Azure PostgreSQL 用于多副本部署。
+An end-to-end store replenishment solution:
 
-## 核心业务约束
+- A deterministic `(s, S)` replenishment engine produces auditable per-SKU order quantities.
+- Microsoft Agent Framework orchestrates the replenishment agent.
+- A harness attribution coordinator invokes constrained seasonality/holiday and substitution diagnostic capabilities.
+- Deterministic counterfactual replay, Shapley allocation, and conservation checks perform the causal math.
+- Daily sales feedback builds a decision outcome ledger that judges both the engine's recommendation and the human override against realized demand.
+- Knowledge entries accumulate per store/SKU and earn weight only as measured accuracy proves them out.
+- A React UI supports quantity adjustment, attribution review, and final submission.
+- SQLite is used for local development; Azure PostgreSQL for multi-replica deployments.
 
-只要用户将 `final_qty` 修改为不同于 `chosen_qty` 的值，就必须完成匹配当前数量版本的归因并由人工审核通过，整个 Run 才能提交。
+## Core Business Constraint
+
+Whenever a user sets `final_qty` to a value different from `chosen_qty`, an attribution matching the current quantity version must be produced **and** approved by a human before the entire run can be submitted.
 
 ```text
-生成补货建议
-  -> 修改数量并填写原因
-  -> 自动创建归因 Case
-  -> Agent/Harness 诊断
-  -> 确定性反事实与 Shapley 归因
-  -> 人工审核
-  -> 全部修改项 HUMAN_APPROVED
-  -> 整个 Run 原子提交并锁定
+Generate replenishment recommendation
+  -> Adjust quantity and provide a reason
+  -> Attribution case created automatically
+  -> Agent/harness diagnosis
+  -> Deterministic counterfactual + Shapley attribution
+  -> Human review
+  -> All adjusted lines reach HUMAN_APPROVED
+  -> Whole run submitted atomically and locked
 ```
 
-系统没有跳过归因或强制提交的旁路：
+There is no bypass that skips attribution or forces submission:
 
-- 再次修改数量会将旧 Case 标记为 `SUPERSEDED`，旧审批立即失效。
-- `partial` 报告不能直接批准，必须先人工补充归因。
-- Agent 连续失败后可进行结构化人工归因，但仍然必须审核。
-- 最终提交是全有或全无；成功后 Run 和关联 Case 只读。
-- 审批与知识沉淀相互独立：审批只解锁提交，知识必须逐条裁定（采纳 / 修订后采纳 / 驳回）。
+- Adjusting a quantity again marks the previous case `SUPERSEDED` and immediately invalidates its approval.
+- A `partial` report cannot be approved directly; a human must supply the missing attribution first.
+- After repeated agent failures a structured manual attribution is allowed, but it still requires review.
+- Final submission is all-or-nothing; on success the run and its cases become read-only.
+- Approval and knowledge capture are independent: approval only unlocks submission, while knowledge must be adjudicated candidate by candidate (accept / amend and accept / reject).
 
-## 归因产出：从"分摊数量"到"知识候选"
+## Attribution Output: From "Allocated Quantity" to "Knowledge Candidate"
 
-分摊（`allocations`）解释的是这一次的数量差异如何在各原因之间划分；它无法回答"下次系统应该怎么假设"。
+Allocations explain how *this* quantity difference splits across causes; they cannot answer "what should the system assume next time?"
 
-原先的分摊还有一个结构性缺陷：反事实以引擎自己的重算结果为基准，而季节、节假日这类系数在该基准里
-已经生效，把它再注入一次不会改变任何数量，分摊天然为零——季节和节假日永远分不到任何数量。
-现在反事实改为**关掉模型点名的那几个原因**再重算，得到 `bare_baseline_qty`：
+The original allocation also had a structural flaw. The counterfactual used the engine's own recalculation as its baseline, and factors such as seasonality and holidays were *already applied* in that baseline — re-injecting them changed no quantity, so their allocation was structurally zero. Seasonality and holidays could never receive any share. The counterfactual now **turns off the specific causes the model named** and recalculates, producing `bare_baseline_qty`:
 
 ```text
 Σ signed_contribution_qty + unexplained_signed_gap = override_qty − conservation_anchor_qty
 ```
 
-`conservation_anchor_qty` 对反事实报告等于 `bare_baseline_qty`，对人工撰写的报告回落到
-`recommended_qty`（人工填写的原因本来就是直接对着差异写的）。没有被点名的假设保持引擎原值：
-它们是这次决策的输入，不是被拆解的对象。
+`conservation_anchor_qty` equals `bare_baseline_qty` for counterfactual reports, and falls back to `recommended_qty` for human-written reports (a human-supplied reason is written directly against the difference anyway). Assumptions the model did not name keep their engine values: they are inputs to this decision, not objects of decomposition.
 
-因此残差是正常且诚实的结果：它表示引擎的假设解释了**建议量**中属于它们的部分，而店长的分歧
-仍未被这些假设解释——那正是知识候选（而不是分摊）要回答的问题。
+A residual is therefore normal and honest: it means the engine's assumptions explained their own share of the **recommended quantity**, while the store manager's disagreement remains unexplained by those assumptions — which is exactly what knowledge candidates (not allocations) are meant to answer.
 
-因此报告在分摊之外还输出 `knowledge_candidates`：**Agent 只说条件和适用范围，不出数字**；
-确定性代码反解引擎，搜索 `kind` 指定的那个参数取什么值才能复现店长实际下的量。
-候选按定义就是"引擎的假设需要改变多少"，degeneracy 被结构性地消除。
+So, beyond allocations, the report also emits `knowledge_candidates`: **the agent states only conditions and scope, never numbers**. Deterministic code then inverts the engine, searching for the value of the parameter named by `kind` that would reproduce the quantity the store manager actually ordered. A candidate is by definition "how much the engine's assumption must change," and degeneracy is structurally eliminated.
 
 ```text
 calibration_status: EXACT | APPROXIMATE | UNREACHABLE | ALREADY_CORRECT | BLOCKED
 acceptable = calibration_status ∈ {EXACT, APPROXIMATE}
 ```
 
-- **`UNREACHABLE` 是有用的结论，不是失败。** 例如店长把 48 改成 10，但整箱起订下限是 18——
-  任何需求系数都到不了 10，说明这次调整根本不是需求判断。此时 `proposed_value` 置空、
-  只保留 `boundary_value`，审核人员无法采纳一个引擎已证明无效的数字，报告同时打上
-  `NO_CALIBRATABLE_CANDIDATE` 风险标记。
-- **`magnitude_plausible: false` 只提示不拦截。** 精确算术会算出 4.6 倍的季节系数；
-  是否成立由人判断，一次 `WRONG_MAGNITUDE` 驳回正是闭环在起作用。
+- **`UNREACHABLE` is a useful conclusion, not a failure.** For example, a manager changes 48 to 10 while the full-case minimum order is 18 — no demand factor can reach 10, which proves the adjustment was not a demand judgment at all. In that case `proposed_value` is cleared, only `boundary_value` is kept, reviewers cannot accept a number the engine has already proven invalid, and the report is flagged with the `NO_CALIBRATABLE_CANDIDATE` risk.
+- **`magnitude_plausible: false` warns but does not block.** Exact arithmetic may compute a 4.6× seasonal factor; whether that is believable is a human call, and a single `WRONG_MAGNITUDE` rejection is the loop doing its job.
 
-### 审核记录驳回，而不只是记录同意
+### Review Records Rejections, Not Just Agreement
 
-审核从"批准 / 打回"升级为**逐候选裁定**，驳回原因取自封闭词表
-（`WRONG_CAUSE` / `NOT_THE_DRIVER` / `WRONG_SCOPE` / `WRONG_MAGNITUDE` / `ONE_OFF_EVENT` /
-`INSUFFICIENT_EVIDENCE` / `ALREADY_KNOWN` / `OTHER`），只有词表封闭，不同审核人的统计才可比。
+Review is upgraded from "approve / send back" to **per-candidate adjudication**, with rejection reasons drawn from a closed vocabulary (`WRONG_CAUSE` / `NOT_THE_DRIVER` / `WRONG_SCOPE` / `WRONG_MAGNITUDE` / `ONE_OFF_EVENT` / `INSUFFICIENT_EVIDENCE` / `ALREADY_KNOWN` / `OTHER`). Only a closed vocabulary makes statistics comparable across reviewers.
 
-驳回单独建表而不是给知识条目加一个 `REJECTED` 状态：驳回没有取值、没有可解析的范围，
-放进引擎读取的那张表里迟早会被误用。候选原样存档，日后修改提示词可以直接对着它答错的那批 Case 重放。
+Rejections get their own table rather than a `REJECTED` status on knowledge entries: a rejection has no value and no parseable scope, and putting it in the table the engine reads would eventually cause misuse. Candidates are archived verbatim, so prompt changes can later be replayed against exactly the cases the model got wrong.
 
-| 接口 | 说明 |
+| Endpoint | Description |
 |---|---|
-| `GET /api/attribution/knowledge/rejections` | 被驳回的知识候选，可按门店/SKU/原因筛选 |
-| `GET /api/attribution/knowledge/feedback` | 归因 Agent 的成绩单：采纳率，以及按原因分组的驳回统计 |
+| `GET /api/attribution/knowledge/rejections` | Rejected knowledge candidates, filterable by store/SKU/reason |
+| `GET /api/attribution/knowledge/feedback` | Attribution agent scorecard: acceptance rate plus rejection stats grouped by reason |
 
-## 学习闭环：从归因到准确率
+## The Learning Loop: From Attribution to Accuracy
 
-归因只解释系统建议量和人工修改量之间的差异，它本身不判断谁更接近门店真实需要。因此仅靠归因和审批，系统沉淀的是人工偏好而不是正确性。日销量回流补齐了这一环：
+Attribution only explains the difference between the system's recommendation and the human override — it does not judge which one is closer to the store's real need. Relying on attribution and approval alone would make the system accumulate human *preference* rather than *correctness*. Daily sales feedback closes that gap:
 
 ```text
-提交锁定 -> 为每条决策开启评判窗口(含未修改行)
-  -> 日销量回流(POS)
-  -> 窗口闭合后计算事后最优量
-  -> 判定 ENGINE_BETTER / HUMAN_BETTER / TIE
-  -> 更新相关知识条目的后验置信度
-  -> 置信度足够时知识才开始影响引擎
+Submit and lock -> Open an evaluation window per decision (including unadjusted lines)
+  -> Daily sales feedback (POS)
+  -> Compute the hindsight-optimal quantity once the window closes
+  -> Adjudicate ENGINE_BETTER / HUMAN_BETTER / TIE
+  -> Update posterior confidence of the related knowledge entries
+  -> Knowledge only starts influencing the engine once confidence is sufficient
 ```
 
-设计要点：
+Design points:
 
-- **未修改行同样进入台账。** 只采样分歧会让系统永远学不到“人工认可的建议本身也可能是错的”。
-- **评判窗口取决策日次日起、长度为提前期 + 覆盖天数**，且只读取冻结快照，不读当前配置，避免用今天的参数评判过去的决策。
-- **缺货损失计入需求。** 空货架是未满足的需求而不是低需求，否则较小的数量总会显得更正确。
-- **窗口未闭合就是 `PENDING`，不是平局**，只有 `COMPLETE` 的行才计入准确率看板和知识晋升。
-- **箱规差异视为平局。** 半个箱规以内的差距双方都无法控制，不构成谁更优。
-- **知识发布后权重为 0。** 权重来自命中率的 Wilson 置信下界，`CANDIDATE -> SHADOW -> ACTIVE -> RETIRED` 全部由实测结果驱动；证据转向时权重自动回落并退休，不依赖人工发现。
+- **Unadjusted lines enter the ledger too.** Sampling only disagreements would mean the system never learns that "a recommendation a human accepted can also be wrong."
+- **The evaluation window starts the day after the decision and spans lead time + coverage days**, and it reads only the frozen snapshot, never the current config — so past decisions are never judged with today's parameters.
+- **Lost sales count as demand.** An empty shelf is unmet demand, not low demand; otherwise the smaller quantity would always look more correct.
+- **An open window is `PENDING`, not a tie.** Only `COMPLETE` rows count toward the accuracy dashboard and knowledge promotion.
+- **Case-pack differences are treated as ties.** A gap within half a case pack is outside either party's control and does not make one better.
+- **Published knowledge starts at weight 0.** Weight comes from the Wilson lower bound of the hit rate, and `CANDIDATE -> SHADOW -> ACTIVE -> RETIRED` is driven entirely by measured outcomes; when the evidence turns, weight decays and the entry retires automatically without waiting for someone to notice.
 
-### 知识如何真正影响下一次补货
+### How Knowledge Actually Influences the Next Replenishment
 
-闭环的最后一段：`ACTIVE` 的知识条目在每次补货时被解析成引擎输入。
-在此之前 `engine.py` 里没有任何一处提到知识——条目可以被采纳、被晋升，却对未来的建议毫无影响。
+The last leg of the loop: `ACTIVE` knowledge entries are resolved into engine inputs on every replenishment run. Before this, `engine.py` mentioned knowledge nowhere — entries could be accepted and promoted yet have zero effect on future recommendations.
 
 ```text
 engine.KNOWLEDGE_TARGETS = factor_overrides.season | factor_overrides.holiday
                          | target_daily_demand_delta | params.fill_rate | params.shelf_max
 ```
 
-- **无法落地的指令必须报错，不能忽略。** 静默跳过的知识和"没有效果的知识"在外部完全无法区分。
-  `SUBSTITUTION_RATE` 指向的是种子输入而非引擎参数，因此归入 `unsupported` 明确返回。
-- **调用方显式传入的参数永远优先。** 反事实重算会钉住某个系数，这个探针必须活下来。
-- **每次运行都产出 `knowledge.resolve` 追溯步骤**（无论是否命中），步骤编号因此不会在两次运行之间漂移。
-- **快照冻结 `knowledge_applied`，重算只读快照。** 事后才被采纳的条目不允许改写它所归因的那个基线，
-  否则每条候选的反解都会随知识库增长而漂移。
+- **A directive that cannot be applied must raise, not be ignored.** From the outside, silently skipped knowledge is indistinguishable from knowledge that had no effect. `SUBSTITUTION_RATE` points at a seed input rather than an engine parameter, so it is returned explicitly under `unsupported`.
+- **Parameters passed explicitly by the caller always win.** Counterfactual recalculation pins a specific factor, and that probe must survive.
+- **Every run emits a `knowledge.resolve` trace step** whether or not anything matched, so step numbering never drifts between runs.
+- **The snapshot freezes `knowledge_applied`, and recalculation reads only the snapshot.** An entry accepted after the fact must not be allowed to rewrite the baseline it was attributed against, or every candidate's inversion would drift as the knowledge base grows.
 
-新增接口：
+New endpoints:
 
-| 接口 | 说明 |
+| Endpoint | Description |
 |---|---|
-| `POST /api/attribution/outcomes/daily-sales` | 回流日销量（可含缺货损失），幂等并触发重算 |
-| `GET /api/attribution/outcomes` | 决策结果台账，可按门店/SKU/状态/判定筛选 |
-| `GET /api/attribution/accuracy` | 准确率看板：引擎与人工的 MAE/MAPE、胜率、缺货与超储 |
-| `GET /api/attribution/knowledge` | 知识条目，可按门店/SKU/状态筛选 |
-| `GET /api/attribution/knowledge/resolve` | 某门店 × SKU 当前实际生效的知识及其权重 |
+| `POST /api/attribution/outcomes/daily-sales` | Feed back daily sales (optionally with lost sales); idempotent and triggers recomputation |
+| `GET /api/attribution/outcomes` | Decision outcome ledger, filterable by store/SKU/status/verdict |
+| `GET /api/attribution/accuracy` | Accuracy dashboard: engine vs. human MAE/MAPE, win rate, stockouts and overstock |
+| `GET /api/attribution/knowledge` | Knowledge entries, filterable by store/SKU/status |
+| `GET /api/attribution/knowledge/resolve` | The knowledge currently in effect for a given store × SKU, with weights |
 
-## 主要模块
+## Main Modules
 
-| 路径 | 说明 |
+| Path | Description |
 |---|---|
-| `forecasting_cache/` | 预计算的门店 × SKU 预测输入 |
-| `backend/engine.py` | 确定性 `(s, S)` 补货引擎 |
-| `backend/agent_runtime.py` | 原补货 Agent Framework 编排 |
-| `backend/attribution/` | Case/Run 状态机、Harness、反事实归因、Worker、持久化 |
-| `backend/attribution/outcomes.py` | 决策结果评判：窗口、事后最优量、判定与准确率聚合（纯函数） |
-| `backend/attribution/knowledge.py` | 知识置信度：Wilson 下界、权重、状态流转、范围匹配，以及解析成引擎指令 `engine_directives`（纯函数） |
-| `backend/api/main.py` | FastAPI 补货、归因、审核和提交 API |
-| `backend/migrations/` | SQLite/PostgreSQL Alembic 迁移 |
-| `frontend/` | React + Ant Design 补货和归因审核 UI |
-| `infra/` | PostgreSQL、托管身份、迁移 Job 和 Container Apps |
-| `CONTRACT.md` | 完整 API 与状态机契约 |
+| `forecasting_cache/` | Precomputed store × SKU forecast inputs |
+| `backend/engine.py` | Deterministic `(s, S)` replenishment engine |
+| `backend/agent_runtime.py` | Original replenishment Agent Framework orchestration |
+| `backend/attribution/` | Case/run state machine, harness, counterfactual attribution, worker, persistence |
+| `backend/attribution/outcomes.py` | Outcome adjudication: windows, hindsight-optimal quantity, verdicts and accuracy aggregation (pure functions) |
+| `backend/attribution/knowledge.py` | Knowledge confidence: Wilson lower bound, weights, state transitions, scope matching, and resolution into `engine_directives` (pure functions) |
+| `backend/api/main.py` | FastAPI replenishment, attribution, review and submission API |
+| `backend/migrations/` | SQLite/PostgreSQL Alembic migrations |
+| `frontend/` | React + Ant Design replenishment and attribution review UI |
+| `infra/` | PostgreSQL, managed identity, migration job and Container Apps |
+| `CONTRACT.md` | Full API and state machine contract |
 
-## 本地运行
+## Running Locally
 
-### 前置条件
+### Prerequisites
 
-- Python 3.11 或更高版本
-- Node.js 18 或更高版本
+- Python 3.11 or later
+- Node.js 18 or later
 - npm
-- 可选：Azure CLI，用于连接 Microsoft Foundry
+- Optional: Azure CLI, for connecting to Microsoft Foundry
 
-### 1. 安装后端
+### 1. Install the backend
 
 ```powershell
-cd store_replenishment\backend
+cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-默认使用 `sqlite+aiosqlite:///./attribution.db`。本地启动时会自动创建所需表。
+The default is `sqlite+aiosqlite:///./attribution.db`. The required tables are created automatically on local startup.
 
-如需启用真实 Harness Agent Loop，编辑 `backend\.env`：
+To enable the real harness agent loop, edit `backend\.env`:
 
 ```dotenv
 FOUNDRY_PROJECT_ENDPOINT=https://<resource>.services.ai.azure.com/api/projects/<project>
@@ -180,167 +165,164 @@ ATTRIBUTION_WORKER_CONCURRENCY=4
 ATTRIBUTION_DEBUG_RAW_IO=true
 ```
 
-本地使用 `AzureCliCredential`：
+Locally it uses `AzureCliCredential`:
 
 ```powershell
 az login
 ```
 
-未配置 Foundry 时，确定性补货仍可正常使用。归因 Worker 会明确记录 Agent 不可用并重试；达到重试上限后 Case 进入 `FAILED`，用户必须使用结构化人工归因完成审核，不能绕过。
+Without Foundry configured, deterministic replenishment still works. The attribution worker records explicitly that the agent is unavailable and retries; once retries are exhausted the case enters `FAILED`, and the user must complete review via structured manual attribution — there is no way around it.
 
-### 2. 安装前端
+### 2. Install the frontend
 
 ```powershell
 cd ..\frontend
 npm install
 ```
 
-### 3. 启动前后端
+### 3. Start backend and frontend
 
-在 `store_replenishment` 目录执行：
+From the repository root:
 
 ```powershell
 .\start-local.ps1
 ```
 
-也可以分别启动：
+Or start them separately:
 
 ```powershell
-# 终端 1
+# Terminal 1
 cd backend
 python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
 
-# 终端 2
+# Terminal 2
 cd frontend
 npm run dev
 ```
 
-- 前端：http://localhost:3000
-- 后端：http://localhost:8000
-- 本地默认用户名：`dmall`
-- 本地默认密码：`dmalltest`
-- 本地默认管理员用户名：`dmall-admin`
-- 本地默认管理员密码：`dmalladmin`
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- Default local username: `dmall`
+- Default local password: `dmalltest`
+- Default local admin username: `dmall-admin`
+- Default local admin password: `dmalladmin`
 
-共享环境应通过 `REPLENISH_DEMO_USERNAME`、`REPLENISH_DEMO_PASSWORD` 和 `REPLENISH_AUTH_SECRET` 配置凭据，不要使用本地默认值。管理员账号通过 `REPLENISH_ADMIN_USERNAME`、`REPLENISH_ADMIN_PASSWORD` 配置；两者留空则不注册管理员账号，管理控制台不可用。
+Shared environments must configure credentials via `REPLENISH_DEMO_USERNAME`, `REPLENISH_DEMO_PASSWORD` and `REPLENISH_AUTH_SECRET` instead of the local defaults. The admin account is configured via `REPLENISH_ADMIN_USERNAME` and `REPLENISH_ADMIN_PASSWORD`; if either is empty, no admin account is registered and the admin console is unavailable.
 
-### 管理控制台
+### Admin Console
 
-以管理员账号登录后，左侧导航会额外出现“管理控制台”分组：
+When signed in as an admin, an extra "Admin Console" group appears in the left navigation:
 
-| 页面 | 用途 |
+| Page | Purpose |
 | --- | --- |
-| 运行总览 | 归因 worker 健康度、队列积压、任务状态分布、worker 租约 |
-| 归因批次 | 按补货批次查看归因进度与状态分布 |
-| 审核队列 | 全量待审核 / 要求修订 / 失败任务，支持批量移除 |
-| 诊断与知识 | 已注册的诊断 Agent 声明，以及生效中的归因知识条目 |
+| Run overview | Attribution worker health, queue backlog, job status distribution, worker leases |
+| Attribution batches | Attribution progress and status distribution per replenishment batch |
+| Review queue | All pending / changes-requested / failed jobs, with bulk removal |
+| Diagnostics & knowledge | Registered diagnostic agent declarations and active attribution knowledge entries |
 
-`/api/admin/` 下的所有接口由服务端按角色校验，普通采购账号访问返回 403。
+All endpoints under `/api/admin/` are role-checked server side; a regular purchasing account receives 403.
 
-**关于“移除待审核任务”**：移除等价于把归因任务置为“已取消”，只清空审核队列，不代表归因通过。补货运行的提交闸门只接受“已批准”，因此移除一个原本阻塞提交的任务，会让该补货运行无法提交，需要重新发起归因。审核队列的“是否阻塞补货提交”列和确认弹窗会在操作前提示这一后果；若目的是解除阻塞，应到任务详情页人工批准。
+**About "removing a pending review job":** removal is equivalent to cancelling the attribution job. It only clears the review queue — it does not mean the attribution passed. The replenishment submission gate accepts only "approved," so removing a job that was blocking submission leaves that replenishment run unsubmittable and requiring a new attribution. The review queue's "blocks submission" column and the confirmation dialog warn about this before you act; if the goal is to unblock, approve the job manually from its detail page instead.
 
-### 生成演示用归因数据
+### Generating Demo Attribution Data
 
-归因只能量化 `backend/attribution/seeds/` 里真实存在的因子。随手挑一个门店、商品和日期，多半会落到“没有可核验原因”这一支——结论本身是对的，但看不到任何分摊过程。下面的脚本按种子数据挑好了组合，一次生成四个覆盖不同归因形态的演示 Case：
+Attribution can only quantify factors that actually exist in `backend/attribution/seeds/`. Picking an arbitrary store, product and date will usually land on the "no verifiable cause" branch — the conclusion is correct, but you see no allocation process at all. The script below picks combinations that match the seed data and generates four demo cases covering different attribution shapes in one go:
 
 ```powershell
-cd store_replenishment/backend
+cd backend
 .venv\Scripts\python.exe scripts\seed_demo_attribution.py
 ```
 
-| 场景 | 说明 |
+| Scenario | Description |
 | --- | --- |
-| `multi` | 冬季 + 元旦两条证据都算出数量，证据覆盖率约 94%，未解释量很小——最理想的归因输出 |
-| `partial` | 节假日算出数量；季节性虽被判定适用但缺少当月因子，标记 `EVIDENCE_UNAVAILABLE_FOR_CAUSE` 而不是估一个数 |
-| `single` | 只有夏季季节性一条证据成立，不会被稀释成多个似是而非的原因 |
-| `none` | 店长给了理由但数据里找不到支撑，系统如实说明而不是编造原因 |
+| `multi` | Winter + New Year both produce quantities; evidence coverage ~94% with a small unexplained residual — the ideal attribution output |
+| `partial` | The holiday yields a quantity; seasonality is deemed applicable but the month's factor is missing, so it is flagged `EVIDENCE_UNAVAILABLE_FOR_CAUSE` instead of being estimated |
+| `single` | Only summer seasonality holds, and it is not diluted into several plausible-looking causes |
+| `none` | The manager gave a reason but the data contains no support; the system says so instead of inventing a cause |
 
-脚本走的是和真人完全一致的接口（`/api/replenish/run` → `/api/replenish/adjust`），归因由真实 Agent 执行，每个 Case 约需一分钟。加 `--no-wait` 只排队不等待，加 `--only multi` 只生成指定场景。每次运行都会新建 Case，重复执行会在列表里留下多条同门店同商品的记录。
+The script uses exactly the same endpoints as a real user (`/api/replenish/run` → `/api/replenish/adjust`), attribution is executed by the real agent, and each case takes about a minute. Add `--no-wait` to queue without waiting, or `--only multi` to generate a single scenario. Each run creates new cases, so repeated runs leave multiple records for the same store and product.
 
-## UI 操作流程
+## UI Walkthrough
 
-登录后可先打开左侧第一项“使用指南”。指南用业务语言展示完整补货流程、数量修改后的归因路径、各状态对应的操作，以及“补货建议”“归因任务”“补货参数”“运行历史”的使用场景。
+After signing in, start with the first item in the left navigation, "User Guide." It describes, in business terms, the full replenishment flow, the attribution path taken after a quantity change, the actions available in each state, and when to use "Replenishment Suggestions," "Attribution Jobs," "Replenishment Parameters" and "Run History."
 
-### 1. 生成补货建议
+### 1. Generate replenishment recommendations
 
-1. 登录并进入“补货建议”。
-2. 选择门店和决策日期。系统固定按“当天申请、次日到货、第三日上架”计算。
-3. 如有需要，先维护当前库存和补货参数。
-4. 选择确定性引擎或补货 Agent 编排。
-5. 点击生成，查看 `chosen_qty`、库存位置、再补点和计算解释。
+1. Sign in and open "Replenishment Suggestions."
+2. Choose a store and decision date. The system always assumes order today, arrive next day, on shelf the third day.
+3. If needed, maintain current inventory and replenishment parameters first.
+4. Choose the deterministic engine or the replenishment agent orchestration.
+5. Click generate and review `chosen_qty`, inventory position, reorder point and the calculation explanation.
 
-### 2. 修改数量并启动归因
+### 2. Adjust quantities and start attribution
 
-1. 修改一个或多个 SKU 的“最终补货量”。
-2. 点击“保存草稿并启动归因”。
-3. 选择必填的原因码，可选填原因说明。
-4. 保存后，系统为每个修改 SKU 创建独立 Case。
+1. Change the "final replenishment quantity" for one or more SKUs.
+2. Click "Save draft and start attribution."
+3. Select the required reason code and optionally add a description.
+4. On save, the system creates a separate case for each adjusted SKU.
 
-保存成功后可以：
+After a successful save you can:
 
-- 直接打开唯一 Case；
-- 或进入“归因审核”查看同一 Job 下的多个 Case。
+- open the single case directly, or
+- go to "Attribution Review" to see multiple cases under the same job.
 
-### 3. 查看因果分析
+### 3. Review the causal analysis
 
-Case 页面会自动轮询 `QUEUED` 和 `RUNNING` 状态。报告生成后重点检查：
+The case page polls automatically while in `QUEUED` and `RUNNING`. Once the report is generated, focus on:
 
-- **概览**：结论、主要原因、风险和冲突；
-- **证据**：证据来源、版本和新鲜度；
-- **分配**：各原因的有符号贡献、未解释残差和守恒公式；
-- **追踪**：Worker 尝试、工具执行和脱敏事件；
-- **版本**：Agent 报告及人工审核历史。
+- **Overview**: conclusion, primary causes, risks and conflicts
+- **Evidence**: evidence sources, versions and freshness
+- **Allocation**: signed contribution per cause, unexplained residual and the conservation formula
+- **Trace**: worker attempts, tool executions and redacted events
+- **Versions**: agent report and human review history
 
-归因数量始终满足：
+The attribution quantities always satisfy:
 
 ```text
-原因贡献之和 + 未解释有符号残差
+sum of cause contributions + unexplained signed residual
   = override_qty - recommended_qty
 ```
 
-### 4. 人工审核
+### 4. Human review
 
-| 操作 | 使用场景 |
+| Action | When to use |
 |---|---|
-| `APPROVE` | Agent 报告完整、非 partial，且证据与分配可接受 |
-| `REQUEST_CHANGES` | 报告需要重新处理或人工补充 |
-| `AMEND_AND_APPROVE` | 人工修订原因贡献和摘要后批准 |
-| `MANUAL_AND_APPROVE` | Agent 最终失败后录入结构化人工归因并批准 |
+| `APPROVE` | The agent report is complete, not partial, and its evidence and allocation are acceptable |
+| `REQUEST_CHANGES` | The report needs reprocessing or human supplementation |
+| `AMEND_AND_APPROVE` | Approve after a human revises the cause contributions and summary |
+| `MANUAL_AND_APPROVE` | Enter a structured manual attribution and approve after the agent has finally failed |
 
-人工修改原因贡献时，填写每个 cause 的：
+When revising cause contributions by hand, provide for each cause:
 
-- 原因码和领域；
-- 有符号贡献量；
-- 解释；
-- 可选证据引用。
+- cause code and domain
+- signed contribution quantity
+- explanation
+- optional evidence references
 
-选择“发布为知识”时还必须指定作用域和过期时间。该选项不是提交 Gate 的必要条件。
+Choosing "publish as knowledge" additionally requires a scope and an expiry. This option is not a prerequisite for the submission gate.
 
-审核抽屉在原因表之下按每条**知识候选**渲染一张卡片，展示候选主张、重算效果、触发条件和适用范围，
-并提供四选一裁定：
+Below the cause table, the review drawer renders one card per **knowledge candidate**, showing the candidate's claim, recalculation effect, trigger conditions and scope, with a four-way adjudication:
 
-| 裁定 | 含义 |
+| Verdict | Meaning |
 |---|---|
-| 暂不处理 | 不写库、不记录，候选留在报告里 |
-| 采纳 | 按候选原值写入知识库（状态 `CANDIDATE`、权重 0） |
-| 修订后采纳 | 审核人员改写取值、生效区间和触发条件后写入 |
-| 驳回 | 不写入知识库，改为写入驳回台账，必须选择原因 |
+| Defer | Nothing written, nothing recorded; the candidate stays in the report |
+| Accept | Written to the knowledge base as-is (status `CANDIDATE`, weight 0) |
+| Amend and accept | The reviewer rewrites the value, effective range and trigger conditions before writing |
+| Reject | Not written to the knowledge base; written to the rejection ledger instead, with a mandatory reason |
 
-`acceptable: false` 的候选（例如受整箱起订下限限制无法标定）只能驳回或暂不处理，
-UI 会禁用采纳与修订，避免采纳一个引擎已证明无效的取值。
-知识裁定同样不是提交 Gate 的必要条件；打回（`REQUEST_CHANGES`）时不接受任何裁定。
+Candidates with `acceptable: false` (for example, uncalibratable because of a full-case minimum) can only be rejected or deferred; the UI disables accept and amend so that no one accepts a value the engine has already proven invalid. Knowledge adjudication is likewise not a prerequisite for the submission gate, and no verdicts are accepted when sending back (`REQUEST_CHANGES`).
 
-### 5. 提交补货结果
+### 5. Submit the replenishment result
 
-返回“补货建议”后点击“提交最终结果”：
+Return to "Replenishment Suggestions" and click "Submit final result":
 
-- 如果任何修改 SKU 缺少最新的 `HUMAN_APPROVED` Case，UI 会显示阻塞项并跳转到 Case。
-- 所有修改项审批完成后，Run 进入 `READY_TO_SUBMIT`。
-- 提交成功后进入 `SUBMITTED_LOCKED`，数量和归因 Case 都不可再修改。
+- If any adjusted SKU lacks an up-to-date `HUMAN_APPROVED` case, the UI shows the blockers and links to the case.
+- Once every adjustment is approved, the run enters `READY_TO_SUBMIT`.
+- After a successful submission it becomes `SUBMITTED_LOCKED`, and neither quantities nor attribution cases can be modified.
 
-## 状态说明
+## States
 
-Run 状态：
+Run states:
 
 ```text
 DRAFT
@@ -350,138 +332,138 @@ DRAFT
   -> SUBMITTED_LOCKED
 ```
 
-Case 状态：
+Case states:
 
 ```text
 QUEUED -> RUNNING -> NEEDS_REVIEW -> HUMAN_APPROVED
                          |              ^
                          -> CHANGES_REQUESTED
 RUNNING -> FAILED -> MANUAL_AND_APPROVE
-任意未提交版本 -> SUPERSEDED
-可取消状态 -> CANCELLED
+any unsubmitted version -> SUPERSEDED
+cancellable states -> CANCELLED
 ```
 
-## 运行端到端集成测试
+## Running the End-to-End Integration Test
 
-以下测试不访问外部 Foundry 服务，而是注入符合 Harness 输出 Schema 的受控诊断结果。它仍然运行真实的 API、SQLite 持久化、租约 Worker、确定性反事实回放、Shapley 分配、人工审核、知识发布和最终提交：
+The test below does not call the external Foundry service; it injects controlled diagnostic results that conform to the harness output schema. It still exercises the real API, SQLite persistence, the leased worker, deterministic counterfactual replay, Shapley allocation, human review, knowledge publication and final submission:
 
 ```powershell
-cd store_replenishment\backend
+cd backend
 python -m pytest tests\test_attribution_api.py::test_replenishment_to_causal_analysis_human_review_and_submission -q
 ```
 
-运行完整后端测试：
+Run the full backend test suite:
 
 ```powershell
 python -m pytest -q
 ```
 
-构建前端：
+Build the frontend:
 
 ```powershell
 cd ..\frontend
 npm run build -- --emptyOutDir
 ```
 
-## 关键配置
+## Key Configuration
 
-| 环境变量 | 默认值/用途 |
+| Environment variable | Default / purpose |
 |---|---|
-| `FOUNDRY_PROJECT_ENDPOINT` | Foundry Project Endpoint；为空时 Agent 能力不可用 |
-| `FOUNDRY_MODEL_DEPLOYMENT` | Harness 与补货 Agent 使用的模型部署名 |
-| `ATTRIBUTION_DATABASE_URL` | 本地默认 SQLite；Azure 使用 `postgresql+asyncpg` |
-| `ATTRIBUTION_WORKER_ENABLED` | 是否启动进程内归因 Worker，默认 `true` |
-| `ATTRIBUTION_WORKER_CONCURRENCY` | 每个后端副本并发 Case 数，默认 `4` |
-| `ATTRIBUTION_DEBUG_RAW_IO` | 开发调试开关；默认 `false`。启用后记录每轮模型/工具输入输出 |
-| `ATTRIBUTION_POSTGRES_ENTRA_AUTH` | PostgreSQL 是否使用 Entra Token |
-| `ATTRIBUTION_POSTGRES_MANAGED_IDENTITY_CLIENT_ID` | PostgreSQL 用户分配托管身份 |
-| `FOUNDRY_MANAGED_IDENTITY_CLIENT_ID` | 可选的 Foundry 用户分配托管身份；否则使用系统身份 |
-| `ATTRIBUTION_RUN_MIGRATIONS_ON_STARTUP` | Azure Revision 启动前执行 Alembic 安全迁移 |
+| `FOUNDRY_PROJECT_ENDPOINT` | Foundry project endpoint; agent capabilities are unavailable when empty |
+| `FOUNDRY_MODEL_DEPLOYMENT` | Model deployment name used by the harness and replenishment agent |
+| `ATTRIBUTION_DATABASE_URL` | SQLite by default locally; `postgresql+asyncpg` on Azure |
+| `ATTRIBUTION_WORKER_ENABLED` | Whether to start the in-process attribution worker; default `true` |
+| `ATTRIBUTION_WORKER_CONCURRENCY` | Concurrent cases per backend replica; default `4` |
+| `ATTRIBUTION_DEBUG_RAW_IO` | Development debug switch; default `false`. When enabled, records each model/tool turn's input and output |
+| `ATTRIBUTION_POSTGRES_ENTRA_AUTH` | Whether PostgreSQL uses an Entra token |
+| `ATTRIBUTION_POSTGRES_MANAGED_IDENTITY_CLIENT_ID` | User-assigned managed identity for PostgreSQL |
+| `FOUNDRY_MANAGED_IDENTITY_CLIENT_ID` | Optional user-assigned managed identity for Foundry; otherwise the system identity is used |
+| `ATTRIBUTION_RUN_MIGRATIONS_ON_STARTUP` | Run safe Alembic migrations before an Azure revision starts |
 
-Harness 只暴露有类型的领域诊断工具。Shell、文件读写、Web Search、后台 Agent、Todo/Mode 和工具自动审批均被禁用；模型只判断证据是否适用，不负责任何数量或提交决策。
+The harness exposes only typed domain diagnostic tools. Shell, file read/write, web search, background agents, todo/mode, and tool auto-approval are all disabled; the model only judges whether evidence applies and is never responsible for any quantity or submission decision.
 
-前端提交数量修改时会把当前界面语言写入 Attribution Case：中文界面使用 `zh-CN`，英文界面使用 `en-US`。Coordinator、诊断 Agent、摘要、原因解释和确定性原因标签均使用该语言；机器字段（JSON key、`cause_code`、`domain`、`evidence_refs`）保持稳定。用户在另一种界面语言下重试失败 Case 时，重试结果会改用当前界面语言。
+When the frontend submits a quantity change, it writes the current UI language into the attribution case: `zh-CN` for the Chinese UI, `en-US` for the English UI. The coordinator, diagnostic agents, summaries, cause explanations and deterministic cause labels all use that language, while machine fields (JSON keys, `cause_code`, `domain`, `evidence_refs`) stay stable. If a user retries a failed case under a different UI language, the retry uses the current UI language.
 
-## Azure 部署
+## Azure Deployment
 
-生产部署会创建：
+A production deployment creates:
 
-- Azure Container Apps 前后端；
-- Azure Database for PostgreSQL Flexible Server；
-- PostgreSQL Entra 管理员和共享数据库托管身份；
-- 手动 Alembic 迁移 Job；
-- Application Insights 和 Log Analytics；
-- 每个后端副本四个归因 Worker 槽位，默认两个常驻副本。
+- Azure Container Apps for the frontend and backend
+- Azure Database for PostgreSQL Flexible Server
+- A PostgreSQL Entra administrator and a shared database managed identity
+- A manual Alembic migration job
+- Application Insights and Log Analytics
+- Four attribution worker slots per backend replica, with two always-on replicas by default
 
-部署脚本会先运行迁移 Job，成功后再更新应用镜像：
+The deployment script runs the migration job first and updates the application images only after it succeeds:
 
 ```powershell
-cd store_replenishment\infra
+cd infra
 .\deploy.ps1
 ```
 
-Linux/macOS：
+Linux/macOS:
 
 ```bash
-cd store_replenishment/infra
+cd infra
 ./deploy.sh
 ```
 
-详细资源、身份和迁移说明见 [`infra/README.md`](infra/README.md)。
+See [`infra/README.md`](infra/README.md) for detailed resource, identity and migration notes.
 
-## 常见问题
+## Troubleshooting
 
-### Case 一直停留在 `QUEUED`
+### A case stays in `QUEUED`
 
-确认：
+Check that:
 
-- `ATTRIBUTION_WORKER_ENABLED=true`；
-- 后端 `/api/health` 中 `attribution_worker.running=true`；
-- 数据库可连接；
-- Worker 副本未缩容到零。
+- `ATTRIBUTION_WORKER_ENABLED=true`
+- the backend's `/api/health` reports `attribution_worker.running=true`
+- the database is reachable
+- worker replicas have not scaled to zero
 
-### Case 最终进入 `FAILED`
+### A case ends in `FAILED`
 
-检查 Case 的 Attempts 和 Trace：
+Inspect the case's attempts and trace:
 
-- Foundry Endpoint 或模型部署是否正确；
-- 本地是否已执行 `az login`；
-- Azure 托管身份是否拥有 Foundry 调用权限；
-- 模型或工具调用是否超时。
+- Is the Foundry endpoint or model deployment correct?
+- Has `az login` been run locally?
+- Does the Azure managed identity have permission to call Foundry?
+- Did a model or tool call time out?
 
-无法恢复 Agent 时，使用 `MANUAL_AND_APPROVE` 完成结构化人工归因。系统不会允许跳过归因直接提交。
+When the agent cannot be recovered, use `MANUAL_AND_APPROVE` to complete a structured manual attribution. The system never allows skipping attribution and submitting directly.
 
-### 如何确认归因 Agent 实际执行
+### How to confirm the attribution agent actually ran
 
-打开 Case 的 **Agent Trace** 页签。每个 Attempt 会显示真实的模型调用数和工具调用数，并可下载脱敏的 JSONL 原始日志。日志包含：
+Open the case's **Agent Trace** tab. Each attempt shows the real number of model calls and tool calls, and a redacted raw JSONL log can be downloaded. The log contains:
 
-- `HARNESS_STARTED`；
-- `MODEL_CALL_STARTED`、`MODEL_CALL_COMPLETED` 或 `MODEL_CALL_FAILED`；
-- `TOOL_CALL_STARTED`、`TOOL_CALL_COMPLETED` 或 `TOOL_CALL_FAILED`；
-- `HARNESS_STRUCTURED_OUTPUT`；
-- `DETERMINISTIC_REPORT_COMPLETED`。
+- `HARNESS_STARTED`
+- `MODEL_CALL_STARTED`, `MODEL_CALL_COMPLETED` or `MODEL_CALL_FAILED`
+- `TOOL_CALL_STARTED`, `TOOL_CALL_COMPLETED` or `TOOL_CALL_FAILED`
+- `HARNESS_STRUCTURED_OUTPUT`
+- `DETERMINISTIC_REPORT_COMPLETED`
 
-日志记录调用边界、耗时、模型、Token 使用量、工具名称和结构化结果摘要，不记录 Prompt 正文、工具参数值、凭据或模型私有思维链。功能上线前生成的历史 Attempt 只有原有的开始/完成事件，不会补造模型或工具调用数据。
+The log records call boundaries, durations, model, token usage, tool names and structured result summaries. It does not record prompt bodies, tool argument values, credentials, or the model's private chain of thought. Historical attempts created before this feature shipped only have the original start/complete events; no model or tool call data is fabricated for them.
 
-开发阶段如需检查每轮原始输入输出，在 `backend\.env` 中设置：
+During development, to inspect each turn's raw input and output, set the following in `backend\.env`:
 
 ```dotenv
 ATTRIBUTION_DEBUG_RAW_IO=true
 ```
 
-重启后端后，新 Attempt 会额外记录 `MODEL_RAW_INPUT`、`MODEL_RAW_OUTPUT`、`TOOL_RAW_INPUT` 和 `TOOL_RAW_OUTPUT`。这些事件可能包含门店、商品、库存和预测等业务数据，只应在受控开发环境中短期开启。凭据字段和模型私有 reasoning 内容始终会被脱敏。
+After restarting the backend, new attempts additionally record `MODEL_RAW_INPUT`, `MODEL_RAW_OUTPUT`, `TOOL_RAW_INPUT` and `TOOL_RAW_OUTPUT`. These events may contain business data such as stores, products, inventory and forecasts, and should only be enabled briefly in a controlled development environment. Credential fields and the model's private reasoning content are always redacted.
 
-### 修改数量后提交按钮仍被阻塞
+### The submit button is still blocked after a quantity change
 
-检查是否：
+Check whether:
 
-- Case 仍处于 `RUNNING`、`NEEDS_REVIEW` 或 `CHANGES_REQUESTED`；
-- 修改数量后又进行了二次修改，导致旧 Case 已 `SUPERSEDED`；
-- 报告为 `partial`，尚未执行 `AMEND_AND_APPROVE`；
-- 只有部分修改 SKU 已审批。
+- a case is still `RUNNING`, `NEEDS_REVIEW` or `CHANGES_REQUESTED`
+- the quantity was changed a second time, making the earlier case `SUPERSEDED`
+- the report is `partial` and `AMEND_AND_APPROVE` has not been performed
+- only some of the adjusted SKUs have been approved
 
-### 前端显示后端不可用
+### The frontend reports the backend is unavailable
 
-普通演示数据在本地开发中可以回退到 Mock，但归因和提交接口永远不会伪造成功。请确认后端已启动、登录 Token 有效，并检查浏览器 Network 面板中的 API 错误。
+Plain demo data can fall back to mocks in local development, but the attribution and submission endpoints never fake success. Verify the backend is running and the login token is valid, and check the API errors in the browser's Network panel.
 
-完整接口字段和错误码见 [`CONTRACT.md`](CONTRACT.md)。
+See [`CONTRACT.md`](CONTRACT.md) for the complete field and error code reference.
