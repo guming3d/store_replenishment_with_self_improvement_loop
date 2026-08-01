@@ -1,90 +1,79 @@
-# Agentic 门店补货与归因系统
+# Agentic 门店补货与自诊闭环系统
 
 **语言：** [English](README.md) · **中文（当前）**
 
-这是一个端到端门店补货方案：
+这是一个端到端门店补货与自诊闭环方案：
 
 - 确定性 `(s, S)` 补货引擎生成可审计的 SKU 建议量。
 - Microsoft Agent Framework 负责补货 Agent 编排。
-- Harness 归因协调器调用受限的季节/节假日和替代关系诊断能力。
-- 确定性反事实回放、Shapley 分配和守恒校验负责因果算量。
-- 日销量回流形成决策结果台账，用实际需求同时评判系统建议量和人工修改量。
-- 知识条目按门店/SKU 维度沉淀，并依据实测准确率逐步获得权重。
-- React UI 支持补货数量调整、归因审核和最终提交。
+- Harness 归因协调器调用季节、节假日与商品替代关系的诊断能力。
+- 确定性反事实回放、Shapley 拆解与守恒校验负责计算因果贡献。
+- 日销量回流生成决策台账，用实际销量同时校验系统建议和人工改数。
+- 归因知识按“门店 × SKU”沉淀，只有实测准确率达标才给引擎叠加权重。
+- React 前端提供补货调字、归因审核与最终提交。
 - SQLite 用于本地开发，Azure PostgreSQL 用于多副本部署。
 
 ## 界面速览
 
-下面按系统实际运行的顺序，走完闭环的一整轮。截图来自运行中的应用，数据为预置演示数据。
+下面按系统实际运行的顺序，展示完整闭环。截图来自运行中的应用，数据为预置演示数据。
 
 ### 1. 引擎给出建议，并公开推导过程
 
-每一行都带着生成它的 `(s, S)` 输入——需求预测、安全库存、提前期、现有库存与在途库存——
-店长面对的是看得见的算术，而不是一个黑盒。
+每一行都附带生成它的 `(s, S)` 输入参数：需求预测、安全库存、提前期、现有库存与在途库存。店长面对的是清晰的推导算术，而不是黑盒结论。
 
 ![补货建议](docs/screenshots/zh/suggestions.png)
 
-### 2. 改数必须给出理由
+### 2. 改数可以，但必须给理由
 
-改数量永远被允许，但从来不是免费的。店长必须从封闭词表里选择原因类型，并写清具体情况。
-这段文字被**当作主张记录，而不是当作证据采信**——它是系统随后要评判的输入，不是系统信任的事实。
+店长可以随时调整订货量。选择原因类型并填入说明后，系统会将这段文字**记录为待核验的主张，而不是直接采信的证据**。
 
 ![调整数量并填写原因](docs/screenshots/zh/suggestions-adjust-modal.png)
 
 ### 3. 每次调整自动生成归因 Case
 
-只要还有 Case 未闭环，整个 Run 就无法提交。再次调整会让旧 Case 失效（`SUPERSEDED`），
-旧的审批同时作废，审批永远不会和它批准过的数字脱节。
+只要有未闭环的 Case，整个批次（Run）就无法提交。再次修改数量会让旧 Case 作废（`SUPERSEDED`），旧审批同步失效，保证审批与最终数字始终绑定。
 
 ![归因 Case 队列](docs/screenshots/zh/attribution-cases.png)
 
 ### 4. Case 台账：改了什么，相对什么基准
 
-反事实精确关掉模型点名的那几个原因再重算，得到 `bare_baseline_qty`，
-季节和节假日这才第一次有了可被度量的对照面。
+反事实归因会关掉模型点名的具体原因重新计算，得出裸基线数量（`bare_baseline_qty`），让季节和节假日因素第一次有了可度量的对照面。
 
 ![归因 Case 详情](docs/screenshots/zh/attribution-detail.png)
 
 ### 5. 用证据评判店长的主张
 
-系统在问一个店长自己回答不了的问题：*你点名的那个因子，取任何值能复现你实际下的量吗？*
-确定性代码反解引擎给出答案。这里的 `UNCALIBRATED` 表示方向判断是对的，但数量无法由它复现——
-这正是"一个理由"和"一个解释"之间的差别。
+系统会自动验证：*店长给出的原因，通过反解引擎参数能否复现他填写的订货量？* 确定性代码反解引擎会给出判定。例如 `UNCALIBRATED` 表示方向没错，但数量无法复现——厘清“有理由”与“算得通”的区别。
 
 ![店长主张裁定与证据](docs/screenshots/zh/attribution-evidence.png)
 
 ### 6. 带符号的分摊与守恒校验
 
-各项贡献必须加回到实际差异。残差是展示出来的，而不是被抹掉的：
-它代表店长的分歧中引擎自身假设解释不了的那一部分，而那正是知识候选存在的意义。
+各项因果贡献相加必须等于实际调整差值。计算残差会明确展示出来：它代表引擎现有假设无法解释的那部分改数分歧，而这正是知识候选要解决的问题。
 
 ![Shapley 分摊与守恒恒等式](docs/screenshots/zh/attribution-allocation.png)
 
-### 7. 扣住整个 Run 的队列
+### 7. 卡住提交的审核队列
 
-每一个未闭环的 Case 都会阻塞它所属 Run 的提交。注意页面顶部的提示：**"忽略"不等于"批准"**——
-忽略只会把 Case 置为已取消，并让那个 Run 在归因重跑之前永远无法提交。
-系统里没有任何一个按钮可以让这个要求消失。
+任何未闭环的 Case 都会阻塞所在 Run 的提交。注意：**“忽略”不等于“批准”**，忽略仅代表撤销 Case，该批次在重跑归因前将一直无法提交。
 
 ![审核队列](docs/screenshots/zh/review-queue.png)
 
 ### 8. 被采纳的知识进入下一次补货
 
-条目的权重只能靠实际销量兑现来赚取。这里没有任何一条是靠审核人的信心晋级的，
-每一份权重都是实测结果。
+知识条目的权重完全靠后续实际销量兑现来赚取。没有靠审核人员主观信心晋级的条目，每一份权重都来自实测验证。
 
 ![知识条目](docs/screenshots/zh/knowledge.png)
 
 ### 9. 运维视图
 
-Worker 健康度、队列深度、Case 状态分布与租约占用——让这个闭环可以被运营，而不只是被演示。
-租约过期是"Worker 中途死掉"被看见的方式，否则队列只会无声地卡住。
+展示 Worker 健康度、队列深度、Case 状态分布与租约占用。租约过期能及时发现异常中断的 Worker，避免任务无声卡死。
 
 ![管理概览](docs/screenshots/zh/admin-overview.png)
 
 ## 核心业务约束
 
-只要用户将 `final_qty` 修改为不同于 `chosen_qty` 的值，就必须完成匹配当前数量版本的归因并由人工审核通过，整个 Run 才能提交。
+店长只要修改了建议补货量（`final_qty != chosen_qty`），就必须完成对应数量版本的归因诊断，并经人工审核通过，全批次（Run）才允许提交。
 
 ```text
 生成补货建议
@@ -97,57 +86,44 @@ Worker 健康度、队列深度、Case 状态分布与租约占用——让这�
   -> 整个 Run 原子提交并锁定
 ```
 
-系统没有跳过归因或强制提交的旁路：
+系统不允许跳过归因或强行提交：
 
 - 再次修改数量会将旧 Case 标记为 `SUPERSEDED`，旧审批立即失效。
-- `partial` 报告不能直接批准，必须先人工补充归因。
-- Agent 连续失败后可进行结构化人工归因，但仍然必须审核。
-- 最终提交是全有或全无；成功后 Run 和关联 Case 只读。
+- 缺失主要证据的 `partial` 报告不能直接过，需补充人工归因。
+- Agent 连续失败后可进行结构化人工归因，但仍需审核。
+- 提交采取“全有或全无”原则（原子提交），成功后锁定为只读。
 - 审批与知识沉淀相互独立：审批只解锁提交，知识必须逐条裁定（采纳 / 修订后采纳 / 驳回）。
 
-## 归因产出：从"分摊数量"到"知识候选"
+## 归因产出：从“分摊数量”到“知识候选”
 
-分摊（`allocations`）解释的是这一次的数量差异如何在各原因之间划分；它无法回答"下次系统应该怎么假设"。
+分摊（`allocations`）解决的是当次数量差异如何在各原因间划分，但无法直接回答“下一次系统该如何假设”。
 
-原先的分摊还有一个结构性缺陷：反事实以引擎自己的重算结果为基准，而季节、节假日这类系数在该基准里
-已经生效，把它再注入一次不会改变任何数量，分摊天然为零——季节和节假日永远分不到任何数量。
-现在反事实改为**关掉模型点名的那几个原因**再重算，得到 `bare_baseline_qty`：
+传统分摊有个结构缺陷：如果以引擎自带的重算结果为基准，由于基准里已经包含了季节、节假日系数，重新注入这些因子的贡献就会始终为零——季节和节假日永远分不到任何数量。现在的做法是**把模型指出的原因从基准中关掉**，重新计算出裸基线数量（`bare_baseline_qty`）：
 
 ```text
 Σ signed_contribution_qty + unexplained_signed_gap = override_qty − conservation_anchor_qty
 ```
 
-`conservation_anchor_qty` 对反事实报告等于 `bare_baseline_qty`，对人工撰写的报告回落到
-`recommended_qty`（人工填写的原因本来就是直接对着差异写的）。没有被点名的假设保持引擎原值：
-它们是这次决策的输入，不是被拆解的对象。
+`conservation_anchor_qty` 在反事实报告中等于 `bare_baseline_qty`，在人工撰写的报告中回落为 `recommended_qty`。未经模型点名的假设保持引擎原值，作为当次决策的输入背景。
 
-因此残差是正常且诚实的结果：它表示引擎的假设解释了**建议量**中属于它们的部分，而店长的分歧
-仍未被这些假设解释——那正是知识候选（而不是分摊）要回答的问题。
+出现残差是正常现象：它说明引擎现有的假设只能解释一部分，店长改数的其余分歧未被解释——这正是知识候选（而不是简单分摊）要解决的问题。
 
-因此报告在分摊之外还输出 `knowledge_candidates`：**Agent 只说条件和适用范围，不出数字**；
-确定性代码反解引擎，搜索 `kind` 指定的那个参数取什么值才能复现店长实际下的量。
-候选按定义就是"引擎的假设需要改变多少"，degeneracy 被结构性地消除。
+因此报告在输出分摊的同时，还会输出 `knowledge_candidates`：**Agent 只提供条件和适用范围，不出具体数值**。确定性代码反解引擎会搜索 `kind` 指定参数的临界取值，算出能复现店长订货量的参数变动。知识候选的本质就是“引擎参数需要调整多少”，从而消除了多解退化（degeneracy）问题。
 
 ```text
 calibration_status: EXACT | APPROXIMATE | UNREACHABLE | ALREADY_CORRECT | BLOCKED
 acceptable = calibration_status ∈ {EXACT, APPROXIMATE}
 ```
 
-- **`UNREACHABLE` 是有用的结论，不是失败。** 例如店长把 48 改成 10，但整箱起订下限是 18——
-  任何需求系数都到不了 10，说明这次调整根本不是需求判断。此时 `proposed_value` 置空、
-  只保留 `boundary_value`，审核人员无法采纳一个引擎已证明无效的数字，报告同时打上
-  `NO_CALIBRATABLE_CANDIDATE` 风险标记。
-- **`magnitude_plausible: false` 只提示不拦截。** 精确算术会算出 4.6 倍的季节系数；
-  是否成立由人判断，一次 `WRONG_MAGNITUDE` 驳回正是闭环在起作用。
+- **`UNREACHABLE` 是明确的诊断结论，而非系统失败。** 例如店长将 48 改为 10，但整箱起订下限是 18——任何需求系数都无法推出 10，说明这次改数并非出于需求判断。此时系统清空 `proposed_value` 并保留 `boundary_value`，阻止审核人员采纳已被引擎证明无效的数值，同时打上 `NO_CALIBRATABLE_CANDIDATE` 风险标记。
+- **`magnitude_plausible: false` 仅作风险预警，不强制拦截。** 例如精确计算得出 4.6 倍的季节系数；参数是否合理由人工裁定，按 `WRONG_MAGNITUDE` 驳回即代表闭环在正常生效。
 
 ### 审核记录驳回，而不只是记录同意
 
-审核从"批准 / 打回"升级为**逐候选裁定**，驳回原因取自封闭词表
-（`WRONG_CAUSE` / `NOT_THE_DRIVER` / `WRONG_SCOPE` / `WRONG_MAGNITUDE` / `ONE_OFF_EVENT` /
-`INSUFFICIENT_EVIDENCE` / `ALREADY_KNOWN` / `OTHER`），只有词表封闭，不同审核人的统计才可比。
+审核机制从“整单通过/退回”升级为**逐条候选裁定**。驳回原因限定在固定词表中：
+`WRONG_CAUSE` / `NOT_THE_DRIVER` / `WRONG_SCOPE` / `WRONG_MAGNITUDE` / `ONE_OFF_EVENT` / `INSUFFICIENT_EVIDENCE` / `ALREADY_KNOWN` / `OTHER`。只有词表封闭，不同审核人的统计数据才具备可比性。
 
-驳回单独建表而不是给知识条目加一个 `REJECTED` 状态：驳回没有取值、没有可解析的范围，
-放进引擎读取的那张表里迟早会被误用。候选原样存档，日后修改提示词可以直接对着它答错的那批 Case 重放。
+驳回记录独立建表，不在知识库里加 `REJECTED` 状态：驳回项没有有效取值和作用范围，混入知识表容易被引擎误读。原始候选完整留存，方便后续优化提示词时对着错例重放测试。
 
 | 接口 | 说明 |
 |---|---|
@@ -156,7 +132,7 @@ acceptable = calibration_status ∈ {EXACT, APPROXIMATE}
 
 ## 学习闭环：从归因到准确率
 
-归因只解释系统建议量和人工修改量之间的差异，它本身不判断谁更接近门店真实需要。因此仅靠归因和审批，系统沉淀的是人工偏好而不是正确性。日销量回流补齐了这一环：
+归因解决的是“为什么改”，但并不保证“改得对”。如果只靠归因和审批，系统沉淀下来的只是店长偏好，而不是客观规律。引入 POS 实际销量回流，才能形成闭环：
 
 ```text
 提交锁定 -> 为每条决策开启评判窗口(含未修改行)
@@ -169,29 +145,26 @@ acceptable = calibration_status ∈ {EXACT, APPROXIMATE}
 
 设计要点：
 
-- **未修改行同样进入台账。** 只采样分歧会让系统永远学不到“人工认可的建议本身也可能是错的”。
-- **评判窗口取决策日次日起、长度为提前期 + 覆盖天数**，且只读取冻结快照，不读当前配置，避免用今天的参数评判过去的决策。
-- **缺货损失计入需求。** 空货架是未满足的需求而不是低需求，否则较小的数量总会显得更正确。
-- **窗口未闭合就是 `PENDING`，不是平局**，只有 `COMPLETE` 的行才计入准确率看板和知识晋升。
-- **箱规差异视为平局。** 半个箱规以内的差距双方都无法控制，不构成谁更优。
-- **知识发布后权重为 0。** 权重来自命中率的 Wilson 置信下界，`CANDIDATE -> SHADOW -> ACTIVE -> RETIRED` 全部由实测结果驱动；证据转向时权重自动回落并退休，不依赖人工发现。
+- **未修改行同样进入台账。** 如果只关注店长改过的行，系统就无法发现“店长没改但建议本身错误”的情况。
+- **评判窗口取决策日次日起，长度为提前期 + 覆盖天数。** 仅读取冻结快照，不读当前配置，避免用今天的参数评判过去的决策。
+- **缺货损失计入真实需求。** 货架卖空属于未满足的需求而非低需求，否则订货量越小越容易被误判为正确。
+- **窗口未闭合保持 `PENDING`，不计入平局。** 仅有 `COMPLETE` 状态的记录会纳入准确率看板与知识晋升计算。
+- **箱规以内的差距视为平局。** 半个箱规以内的误差双方都无法精准控制，不作为优劣判定依据。
+- **知识刚生成时权重为 0。** 权重基于胜率的 Wilson 置信区间下界计算，状态流转（`CANDIDATE -> SHADOW -> ACTIVE -> RETIRED`）完全由销售业绩数据驱动；一旦实测效果下滑，权重会自动回落并退役，不需要人工清理。
 
 ### 知识如何真正影响下一次补货
 
-闭环的最后一段：`ACTIVE` 的知识条目在每次补货时被解析成引擎输入。
-在此之前 `engine.py` 里没有任何一处提到知识——条目可以被采纳、被晋升，却对未来的建议毫无影响。
+`ACTIVE` 状态的知识条目在下一次补货时会自动转换为引擎输入参数。这样避免了“知识虽然通过了审批，但对系统没有任何实际影响”的假闭环问题。
 
 ```text
 engine.KNOWLEDGE_TARGETS = factor_overrides.season | factor_overrides.holiday
                          | target_daily_demand_delta | params.fill_rate | params.shelf_max
 ```
 
-- **无法落地的指令必须报错，不能忽略。** 静默跳过的知识和"没有效果的知识"在外部完全无法区分。
-  `SUBSTITUTION_RATE` 指向的是种子输入而非引擎参数，因此归入 `unsupported` 明确返回。
-- **调用方显式传入的参数永远优先。** 反事实重算会钉住某个系数，这个探针必须活下来。
-- **每次运行都产出 `knowledge.resolve` 追溯步骤**（无论是否命中），步骤编号因此不会在两次运行之间漂移。
-- **快照冻结 `knowledge_applied`，重算只读快照。** 事后才被采纳的条目不允许改写它所归因的那个基线，
-  否则每条候选的反解都会随知识库增长而漂移。
+- **无法生效的知识必须明确报错，不能静默忽略。** 比如 `SUBSTITUTION_RATE` 属于原始输入而非引擎可调参数，系统会明确标记为 `unsupported`。
+- **调用方显式传入的参数永远优先。** 保证反事实重算时固定探针系数的逻辑不受影响。
+- **每次计算都会生成 `knowledge.resolve` 追溯记录**（无论是否命中知识），保证追溯编号一致。
+- **历史决策绑定的知识在提交时即冻结快照。** 后续新采纳的知识不会改写历史归因基线，防止历史归因随知识库扩充而发生漂移。
 
 新增接口：
 
@@ -209,10 +182,10 @@ engine.KNOWLEDGE_TARGETS = factor_overrides.season | factor_overrides.holiday
 |---|---|
 | `forecasting_cache/` | 预计算的门店 × SKU 预测输入 |
 | `backend/engine.py` | 确定性 `(s, S)` 补货引擎 |
-| `backend/agent_runtime.py` | 原补货 Agent Framework 编排 |
+| `backend/agent_runtime.py` | 补货 Agent Framework 编排 |
 | `backend/attribution/` | Case/Run 状态机、Harness、反事实归因、Worker、持久化 |
 | `backend/attribution/outcomes.py` | 决策结果评判：窗口、事后最优量、判定与准确率聚合（纯函数） |
-| `backend/attribution/knowledge.py` | 知识置信度：Wilson 下界、权重、状态流转、范围匹配，以及解析成引擎指令 `engine_directives`（纯函数） |
+| `backend/attribution/knowledge.py` | 知识置信度：Wilson 下界、权重、状态流转、范围匹配及引擎指令转换（纯函数） |
 | `backend/api/main.py` | FastAPI 补货、归因、审核和提交 API |
 | `backend/migrations/` | SQLite/PostgreSQL Alembic 迁移 |
 | `frontend/` | React + Ant Design 补货和归因审核 UI |
@@ -226,7 +199,7 @@ engine.KNOWLEDGE_TARGETS = factor_overrides.season | factor_overrides.holiday
 - Python 3.11 或更高版本
 - Node.js 18 或更高版本
 - npm
-- 可选：Azure CLI，用于连接 Microsoft Foundry
+- 可选：Azure CLI（用于连接 Microsoft Foundry）
 
 ### 1. 安装后端
 
@@ -238,7 +211,7 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-默认使用 `sqlite+aiosqlite:///./attribution.db`。本地启动时会自动创建所需表。
+默认使用 `sqlite+aiosqlite:///./attribution.db`。本地启动时会自动创建数据库表。
 
 如需启用真实 Harness Agent Loop，编辑 `backend\.env`：
 
@@ -247,17 +220,17 @@ FOUNDRY_PROJECT_ENDPOINT=https://<resource>.services.ai.azure.com/api/projects/<
 FOUNDRY_MODEL_DEPLOYMENT=<model-deployment-name>
 ATTRIBUTION_WORKER_ENABLED=true
 ATTRIBUTION_WORKER_CONCURRENCY=4
-# Development only: capture each model/tool turn input and output in Agent Trace.
+# 开发调试：在 Agent Trace 中记录每轮模型/工具的输入与输出
 ATTRIBUTION_DEBUG_RAW_IO=true
 ```
 
-本地使用 `AzureCliCredential`：
+本地使用 `AzureCliCredential` 鉴权：
 
 ```powershell
 az login
 ```
 
-未配置 Foundry 时，确定性补货仍可正常使用。归因 Worker 会明确记录 Agent 不可用并重试；达到重试上限后 Case 进入 `FAILED`，用户必须使用结构化人工归因完成审核，不能绕过。
+未配置 Foundry 时，确定性补货仍可正常使用。归因 Worker 会记录 Agent 不可用并自动重试；达到重试上限后 Case 进入 `FAILED` 状态，此时需通过结构化人工归因完成审核，无法绕过。
 
 ### 2. 安装前端
 
@@ -266,7 +239,7 @@ cd ..\frontend
 npm install
 ```
 
-### 3. 启动前后端
+### 3. 启动应用
 
 在仓库根目录执行：
 
@@ -288,31 +261,29 @@ npm run dev
 
 - 前端：http://localhost:3000
 - 后端：http://localhost:8000
-- 本地默认用户名：`dmall`
-- 本地默认密码：`dmalltest`
-- 本地默认管理员用户名：`dmall-admin`
-- 本地默认管理员密码：`dmalladmin`
+- 本地默认账号：`dmall` / `dmalltest`
+- 本地默认管理员账号：`dmall-admin` / `dmalladmin`
 
-共享环境应通过 `REPLENISH_DEMO_USERNAME`、`REPLENISH_DEMO_PASSWORD` 和 `REPLENISH_AUTH_SECRET` 配置凭据，不要使用本地默认值。管理员账号通过 `REPLENISH_ADMIN_USERNAME`、`REPLENISH_ADMIN_PASSWORD` 配置；两者留空则不注册管理员账号，管理控制台不可用。
+共享环境应通过环境变量 `REPLENISH_DEMO_USERNAME`、`REPLENISH_DEMO_PASSWORD` 和 `REPLENISH_AUTH_SECRET` 配置凭据。管理员账号通过 `REPLENISH_ADMIN_USERNAME`、`REPLENISH_ADMIN_PASSWORD` 配置；两者留空则不注册管理员账号，管理控制台不可用。
 
 ### 管理控制台
 
-以管理员账号登录后，左侧导航会额外出现“管理控制台”分组：
+以管理员账号登录后，侧边栏会显示“管理控制台”分组：
 
 | 页面 | 用途 |
 | --- | --- |
-| 运行总览 | 归因 worker 健康度、队列积压、任务状态分布、worker 租约 |
+| 运行总览 | 归因 Worker 健康度、队列积压、任务状态分布、Worker 租约 |
 | 归因批次 | 按补货批次查看归因进度与状态分布 |
-| 审核队列 | 全量待审核 / 要求修订 / 失败任务，支持批量移除 |
-| 诊断与知识 | 已注册的诊断 Agent 声明，以及生效中的归因知识条目 |
+| 审核队列 | 查看待审核/待修订/失败任务，支持批量移除 |
+| 诊断与知识 | 已注册的诊断 Agent 声明及生效中的归因知识 |
 
-`/api/admin/` 下的所有接口由服务端按角色校验，普通采购账号访问返回 403。
+`/api/admin/` 下的所有接口均按角色校验，普通账号访问返回 403。
 
-**关于“移除待审核任务”**：移除等价于把归因任务置为“已取消”，只清空审核队列，不代表归因通过。补货运行的提交闸门只接受“已批准”，因此移除一个原本阻塞提交的任务，会让该补货运行无法提交，需要重新发起归因。审核队列的“是否阻塞补货提交”列和确认弹窗会在操作前提示这一后果；若目的是解除阻塞，应到任务详情页人工批准。
+**“移除待审核任务”说明**：“移除”操作等同于取消该归因任务，仅清空队列，并不代表归因通过。提交关卡只识别“已批准”状态，因此移除任务会导致所属批次无法提交，必须重新发起归因。审核队列中的提示列与确认弹窗会在此类操作前进行预警；如需解除阻塞，请在任务详情页手动审批。
 
 ### 生成演示用归因数据
 
-归因只能量化 `backend/attribution/seeds/` 里真实存在的因子。随手挑一个门店、商品和日期，多半会落到“没有可核验原因”这一支——结论本身是对的，但看不到任何分摊过程。下面的脚本按种子数据挑好了组合，一次生成四个覆盖不同归因形态的演示 Case：
+归因仅能量化 `backend/attribution/seeds/` 中预置的因子。如果随机选择门店、商品和日期，可能因缺少数据支撑而得出“无核验原因”的结论——虽然结论属实，但无法展示归因过程。示例脚本预置了典型的测试组合，可一次性生成四种不同形态的演示 Case：
 
 ```powershell
 cd backend
@@ -320,98 +291,91 @@ cd backend
 ```
 
 | 场景 | 说明 |
-| --- | --- |
-| `multi` | 冬季 + 元旦两条证据都算出数量，证据覆盖率约 94%，未解释量很小——最理想的归因输出 |
-| `partial` | 节假日算出数量；季节性虽被判定适用但缺少当月因子，标记 `EVIDENCE_UNAVAILABLE_FOR_CAUSE` 而不是估一个数 |
-| `single` | 只有夏季季节性一条证据成立，不会被稀释成多个似是而非的原因 |
-| `none` | 店长给了理由但数据里找不到支撑，系统如实说明而不是编造原因 |
+|---|---|
+| `multi` | 冬季 + 元旦两条证据均算出数值，证据覆盖率约 94%，未解释量极小（最理想形态） |
+| `partial` | 节假日算出数值；季节性虽判定适用但缺少当月因子，标记 `EVIDENCE_UNAVAILABLE_FOR_CAUSE` 而非盲目估算 |
+| `single` | 仅夏季季节性一条证据成立，不会被稀释为多个似是而非的原因 |
+| `none` | 店长提供了理由但在数据中未找到支撑，系统据实说明而非编造原因 |
 
-脚本走的是和真人完全一致的接口（`/api/replenish/run` → `/api/replenish/adjust`），归因由真实 Agent 执行，每个 Case 约需一分钟。加 `--no-wait` 只排队不等待，加 `--only multi` 只生成指定场景。每次运行都会新建 Case，重复执行会在列表里留下多条同门店同商品的记录。
+脚本调用真实接口（`/api/replenish/run` → `/api/replenish/adjust`），由真实 Agent 执行归因，每个 Case 约耗时 1 分钟。添加 `--no-wait` 参数仅排队不等待；添加 `--only multi` 参数可仅生成指定场景。每次运行均会创建新 Case。
 
 ## UI 操作流程
 
-登录后可先打开左侧第一项“使用指南”。指南用业务语言展示完整补货流程、数量修改后的归因路径、各状态对应的操作，以及“补货建议”“归因任务”“补货参数”“运行历史”的使用场景。
+登录后可打开左侧“使用指南”查看完整补货流程、改数归因路径及各状态操作说明。
 
 ### 1. 生成补货建议
 
 1. 登录并进入“补货建议”。
-2. 选择门店和决策日期。系统固定按“当天申请、次日到货、第三日上架”计算。
-3. 如有需要，先维护当前库存和补货参数。
+2. 选择门店与决策日期。系统按“当天申请、次日到货、第三日上架”计算。
+3. 可根据需要维护现有库存与补货参数。
 4. 选择确定性引擎或补货 Agent 编排。
-5. 点击生成，查看 `chosen_qty`、库存位置、再补点和计算解释。
+5. 点击生成，查看 `chosen_qty`、库存位置、再补点与推导说明。
 
 ### 2. 修改数量并启动归因
 
 1. 修改一个或多个 SKU 的“最终补货量”。
 2. 点击“保存草稿并启动归因”。
-3. 选择必填的原因码，可选填原因说明。
-4. 保存后，系统为每个修改 SKU 创建独立 Case。
+3. 选择必填的原因码，填入原因说明。
+4. 保存后，系统为每个修改的 SKU 创建独立 Case。
 
-保存成功后可以：
-
-- 直接打开唯一 Case；
-- 或进入“归因审核”查看同一 Job 下的多个 Case。
+保存成功后可直接打开对应 Case，或进入“归因审核”查看同一批次下的所有 Case。
 
 ### 3. 查看因果分析
 
-Case 页面会自动轮询 `QUEUED` 和 `RUNNING` 状态。报告生成后重点检查：
+Case 页面会自动轮询 `QUEUED` 与 `RUNNING` 状态。报告生成后重点查看：
 
-- **概览**：结论、主要原因、风险和冲突；
-- **证据**：证据来源、版本和新鲜度；
-- **分配**：各原因的有符号贡献、未解释残差和守恒公式；
-- **追踪**：Worker 尝试、工具执行和脱敏事件；
-- **版本**：Agent 报告及人工审核历史。
+- **概览**：结论、主要原因、风险与冲突；
+- **证据**：证据来源、版本与新鲜度；
+- **分摊**：各原因的符号贡献量、未解释残差及守恒公式；
+- **追踪**：Worker 尝试、工具执行与脱敏日志；
+- **版本**：Agent 报告及历史审核记录。
 
-归因数量始终满足：
+归因数量始终满足守恒恒等式：
 
 ```text
-原因贡献之和 + 未解释有符号残差
-  = override_qty - recommended_qty
+原因贡献之和 + 未解释残差 = override_qty - recommended_qty
 ```
 
 ### 4. 人工审核
 
 | 操作 | 使用场景 |
 |---|---|
-| `APPROVE` | Agent 报告完整、非 partial，且证据与分配可接受 |
+| `APPROVE` | Agent 报告完整（非 partial），且证据与分摊合理 |
 | `REQUEST_CHANGES` | 报告需要重新处理或人工补充 |
 | `AMEND_AND_APPROVE` | 人工修订原因贡献和摘要后批准 |
 | `MANUAL_AND_APPROVE` | Agent 最终失败后录入结构化人工归因并批准 |
 
-人工修改原因贡献时，填写每个 cause 的：
+人工修改原因贡献时，需填写每项 cause 的：
 
-- 原因码和领域；
-- 有符号贡献量；
-- 解释；
+- 原因码与领域；
+- 符号贡献量；
+- 解释说明；
 - 可选证据引用。
 
-选择“发布为知识”时还必须指定作用域和过期时间。该选项不是提交 Gate 的必要条件。
+勾选“发布为知识”需指定作用域与过期时间（非提交必选项）。
 
-审核抽屉在原因表之下按每条**知识候选**渲染一张卡片，展示候选主张、重算效果、触发条件和适用范围，
-并提供四选一裁定：
+审核抽屉会在原因表下方为每条**知识候选**生成卡片，展示候选参数、重算效果、触发条件与生效范围，提供以下四种处理方式：
 
 | 裁定 | 含义 |
 |---|---|
-| 暂不处理 | 不写库、不记录，候选留在报告里 |
-| 采纳 | 按候选原值写入知识库（状态 `CANDIDATE`、权重 0） |
-| 修订后采纳 | 审核人员改写取值、生效区间和触发条件后写入 |
-| 驳回 | 不写入知识库，改为写入驳回台账，必须选择原因 |
+| 暂不处理 | 不写入数据库，候选保留在报告中 |
+| 采纳 | 按候选原值写入知识库（初始状态 `CANDIDATE`，权重为 0） |
+| 修订后采纳 | 审核人员修改取值、生效区间与触发条件后写入 |
+| 驳回 | 不写入知识库，记入驳回台账，需选择驳回原因 |
 
-`acceptable: false` 的候选（例如受整箱起订下限限制无法标定）只能驳回或暂不处理，
-UI 会禁用采纳与修订，避免采纳一个引擎已证明无效的取值。
-知识裁定同样不是提交 Gate 的必要条件；打回（`REQUEST_CHANGES`）时不接受任何裁定。
+`acceptable: false` 的候选（例如受整箱起订限制无法标定）仅支持驳回或暂不处理，界面会自动禁用采纳与修订选项。打回（`REQUEST_CHANGES`）操作不支持知识裁定。
 
 ### 5. 提交补货结果
 
-返回“补货建议”后点击“提交最终结果”：
+返回“补货建议”页面点击“提交最终结果”：
 
-- 如果任何修改 SKU 缺少最新的 `HUMAN_APPROVED` Case，UI 会显示阻塞项并跳转到 Case。
-- 所有修改项审批完成后，Run 进入 `READY_TO_SUBMIT`。
-- 提交成功后进入 `SUBMITTED_LOCKED`，数量和归因 Case 都不可再修改。
+- 若有修改 SKU 缺少最新 `HUMAN_APPROVED` Case，界面会提示阻塞项并支持跳转。
+- 所有修改项审核完成后，Run 进入 `READY_TO_SUBMIT` 状态。
+- 提交成功后进入 `SUBMITTED_LOCKED` 锁定状态，数量与归因 Case 均变为只读。
 
 ## 状态说明
 
-Run 状态：
+Run 状态流转：
 
 ```text
 DRAFT
@@ -421,7 +385,7 @@ DRAFT
   -> SUBMITTED_LOCKED
 ```
 
-Case 状态：
+Case 状态流转：
 
 ```text
 QUEUED -> RUNNING -> NEEDS_REVIEW -> HUMAN_APPROVED
@@ -434,20 +398,20 @@ RUNNING -> FAILED -> MANUAL_AND_APPROVE
 
 ## 运行端到端集成测试
 
-以下测试不访问外部 Foundry 服务，而是注入符合 Harness 输出 Schema 的受控诊断结果。它仍然运行真实的 API、SQLite 持久化、租约 Worker、确定性反事实回放、Shapley 分配、人工审核、知识发布和最终提交：
+测试使用受控诊断数据代替外部 Foundry 服务，涵盖真实 API、SQLite 持久化、租约 Worker、反事实回放、Shapley 分摊、人工审核、知识发布与最终提交完整链路：
 
 ```powershell
 cd backend
 python -m pytest tests\test_attribution_api.py::test_replenishment_to_causal_analysis_human_review_and_submission -q
 ```
 
-运行完整后端测试：
+运行完整后端测试集：
 
 ```powershell
 python -m pytest -q
 ```
 
-构建前端：
+构建前端项目：
 
 ```powershell
 cd ..\frontend
@@ -460,71 +424,70 @@ npm run build -- --emptyOutDir
 |---|---|
 | `FOUNDRY_PROJECT_ENDPOINT` | Foundry Project Endpoint；为空时 Agent 能力不可用 |
 | `FOUNDRY_MODEL_DEPLOYMENT` | Harness 与补货 Agent 使用的模型部署名 |
-| `ATTRIBUTION_DATABASE_URL` | 本地默认 SQLite；Azure 使用 `postgresql+asyncpg` |
-| `ATTRIBUTION_WORKER_ENABLED` | 是否启动进程内归因 Worker，默认 `true` |
-| `ATTRIBUTION_WORKER_CONCURRENCY` | 每个后端副本并发 Case 数，默认 `4` |
-| `ATTRIBUTION_DEBUG_RAW_IO` | 开发调试开关；默认 `false`。启用后记录每轮模型/工具输入输出 |
+| `ATTRIBUTION_DATABASE_URL` | 本地默认 SQLite；Azure 环境使用 `postgresql+asyncpg` |
+| `ATTRIBUTION_WORKER_ENABLED` | 是否启动进程内归因 Worker（默认 `true`） |
+| `ATTRIBUTION_WORKER_CONCURRENCY` | 每个后端副本并发 Case 数（默认 `4`） |
+| `ATTRIBUTION_DEBUG_RAW_IO` | 开发调试开关（默认 `false`），开启后记录模型与工具原始 I/O |
 | `ATTRIBUTION_POSTGRES_ENTRA_AUTH` | PostgreSQL 是否使用 Entra Token |
 | `ATTRIBUTION_POSTGRES_MANAGED_IDENTITY_CLIENT_ID` | PostgreSQL 用户分配托管身份 |
-| `FOUNDRY_MANAGED_IDENTITY_CLIENT_ID` | 可选的 Foundry 用户分配托管身份；否则使用系统身份 |
-| `ATTRIBUTION_RUN_MIGRATIONS_ON_STARTUP` | Azure Revision 启动前执行 Alembic 安全迁移 |
+| `FOUNDRY_MANAGED_IDENTITY_CLIENT_ID` | 可选的 Foundry 用户分配托管身份 |
+| `ATTRIBUTION_RUN_MIGRATIONS_ON_STARTUP` | Azure Revision 启动前自动执行 Alembic 迁移 |
 
-Harness 只暴露有类型的领域诊断工具。Shell、文件读写、Web Search、后台 Agent、Todo/Mode 和工具自动审批均被禁用；模型只判断证据是否适用，不负责任何数量或提交决策。
+Harness 仅暴露带类型的领域诊断工具。Shell、文件读写、Web Search、后台 Agent 等均被禁用；模型仅判断证据是否适用，不参与任何数量或提交决策。
 
-前端提交数量修改时会把当前界面语言写入 Attribution Case：中文界面使用 `zh-CN`，英文界面使用 `en-US`。Coordinator、诊断 Agent、摘要、原因解释和确定性原因标签均使用该语言；机器字段（JSON key、`cause_code`、`domain`、`evidence_refs`）保持稳定。用户在另一种界面语言下重试失败 Case 时，重试结果会改用当前界面语言。
+前端提交改数时会将当前界面语言写入 Attribution Case（`zh-CN` 或 `en-US`）。Coordinator、诊断 Agent、摘要与原因解释均使用该语言，而 JSON key、`cause_code` 等机器字段保持固定。
 
 ## Azure 部署
 
-生产部署会创建：
+生产部署包含：
 
 - Azure Container Apps 前后端；
 - Azure Database for PostgreSQL Flexible Server；
-- PostgreSQL Entra 管理员和共享数据库托管身份；
+- PostgreSQL Entra 管理员与托管身份；
 - 手动 Alembic 迁移 Job；
-- Application Insights 和 Log Analytics；
-- 每个后端副本四个归因 Worker 槽位，默认两个常驻副本。
+- Application Insights 与 Log Analytics。
 
-部署脚本会先运行迁移 Job，成功后再更新应用镜像：
+部署脚本会优先运行迁移 Job，成功后再更新应用镜像：
 
 ```powershell
 cd infra
 .\deploy.ps1
 ```
 
-Linux/macOS：
+Linux/macOS 环境：
 
 ```bash
 cd infra
 ./deploy.sh
 ```
 
-详细资源、身份和迁移说明见 [`infra/README.md`](infra/README.md)。
+详细配置说明参考 [`infra/README.md`](infra/README.md)。
 
 ## 常见问题
 
 ### Case 一直停留在 `QUEUED`
 
-确认：
+排查步骤：
 
 - `ATTRIBUTION_WORKER_ENABLED=true`；
 - 后端 `/api/health` 中 `attribution_worker.running=true`；
-- 数据库可连接；
-- Worker 副本未缩容到零。
+- 数据库连接正常；
+- Worker 副本数大于 0。
 
 ### Case 最终进入 `FAILED`
 
 检查 Case 的 Attempts 和 Trace：
 
-- Foundry Endpoint 或模型部署是否正确；
-- 本地是否已执行 `az login`；
-- Azure 托管身份是否拥有 Foundry 调用权限；
-- 模型或工具调用是否超时。
+- Foundry Endpoint 或模型部署配置；
+- 本地环境是否已执行 `az login`；
+- Azure 托管身份权限设置；
+- 模型或工具调用超时。
 
-无法恢复 Agent 时，使用 `MANUAL_AND_APPROVE` 完成结构化人工归因。系统不会允许跳过归因直接提交。
+无法恢复 Agent 时，使用 `MANUAL_AND_APPROVE` 完成结构化人工归因。系统不允许跳过归因直接提交。
 
 ### 如何确认归因 Agent 实际执行
 
-打开 Case 的 **Agent Trace** 页签。每个 Attempt 会显示真实的模型调用数和工具调用数，并可下载脱敏的 JSONL 原始日志。日志包含：
+打开 Case 的 **Agent Trace** 页签。每个 Attempt 均会显示真实的模型与工具调用次数，并支持下载脱敏日志。日志包含：
 
 - `HARNESS_STARTED`；
 - `MODEL_CALL_STARTED`、`MODEL_CALL_COMPLETED` 或 `MODEL_CALL_FAILED`；
@@ -532,27 +495,27 @@ cd infra
 - `HARNESS_STRUCTURED_OUTPUT`；
 - `DETERMINISTIC_REPORT_COMPLETED`。
 
-日志记录调用边界、耗时、模型、Token 使用量、工具名称和结构化结果摘要，不记录 Prompt 正文、工具参数值、凭据或模型私有思维链。功能上线前生成的历史 Attempt 只有原有的开始/完成事件，不会补造模型或工具调用数据。
+日志仅记录调用耗时、模型、Token 使用量与工具名称，不记录 Prompt 正文、凭据或私有思维链。
 
-开发阶段如需检查每轮原始输入输出，在 `backend\.env` 中设置：
+开发阶段如需检查原始输入输出，在 `backend\.env` 中设置：
 
 ```dotenv
 ATTRIBUTION_DEBUG_RAW_IO=true
 ```
 
-重启后端后，新 Attempt 会额外记录 `MODEL_RAW_INPUT`、`MODEL_RAW_OUTPUT`、`TOOL_RAW_INPUT` 和 `TOOL_RAW_OUTPUT`。这些事件可能包含门店、商品、库存和预测等业务数据，只应在受控开发环境中短期开启。凭据字段和模型私有 reasoning 内容始终会被脱敏。
+开启后会记录原始 I/O 数据，仅建议在受控开发环境中临时开启。
 
 ### 修改数量后提交按钮仍被阻塞
 
-检查是否：
+检查以下情况：
 
-- Case 仍处于 `RUNNING`、`NEEDS_REVIEW` 或 `CHANGES_REQUESTED`；
-- 修改数量后又进行了二次修改，导致旧 Case 已 `SUPERSEDED`；
+- Case 仍处于 `RUNNING`、`NEEDS_REVIEW` 或 `CHANGES_REQUESTED` 状态；
+- 二次修改数量导致原 Case 变为 `SUPERSEDED`；
 - 报告为 `partial`，尚未执行 `AMEND_AND_APPROVE`；
-- 只有部分修改 SKU 已审批。
+- 部分修改 SKU 尚未通过审核。
 
-### 前端显示后端不可用
+### 前端提示后端不可用
 
-普通演示数据在本地开发中可以回退到 Mock，但归因和提交接口永远不会伪造成功。请确认后端已启动、登录 Token 有效，并检查浏览器 Network 面板中的 API 错误。
+确认后端服务已启动、登录 Token 未过期，并检查浏览器 Network 面板中的 API 报错。
 
-完整接口字段和错误码见 [`CONTRACT.md`](CONTRACT.md)。
+完整接口字段与错误码参考 [`CONTRACT.md`](CONTRACT.md)。
