@@ -293,9 +293,9 @@ cd backend
 | 场景 | 说明 |
 |---|---|
 | `multi` | 冬季 + 元旦两条证据均算出数值，证据覆盖率约 94%，未解释量极小（最理想形态） |
-| `partial` | 节假日算出数值；季节性虽判定适用但缺少当月因子，标记 `EVIDENCE_UNAVAILABLE_FOR_CAUSE` 而非盲目估算 |
-| `single` | 仅夏季季节性一条证据成立，不会被稀释为多个似是而非的原因 |
-| `none` | 店长提供了理由但在数据中未找到支撑，系统据实说明而非编造原因 |
+| `partial` | 节假日算出数值；季节性因缺少当月因子标记为 `EVIDENCE_UNAVAILABLE_FOR_CAUSE`，拒绝盲目估算 |
+| `single` | 仅夏季季节性一条证据成立，避免稀释出多余原因 |
+| `none` | 店长提供了理由但在数据中无支撑，系统据实说明情况 |
 
 脚本调用真实接口（`/api/replenish/run` → `/api/replenish/adjust`），由真实 Agent 执行归因，每个 Case 约耗时 1 分钟。添加 `--no-wait` 参数仅排队不等待；添加 `--only multi` 参数可仅生成指定场景。每次运行均会创建新 Case。
 
